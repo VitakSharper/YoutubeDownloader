@@ -1,12 +1,73 @@
-﻿<Window x:Class="YoutubeDownloader.App.MainWindow"
+<Window x:Class="YoutubeDownloader.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:YoutubeDownloader.App"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        xmlns:conv="clr-namespace:YoutubeDownloader.App.Converters"
+        xmlns:models="clr-namespace:YoutubeDownloader.Core.Models;assembly=YoutubeDownloader.Core"
+        Title="YouTube Downloader" Height="520" Width="640" MinWidth="560" MinHeight="480">
+    <Window.Resources>
+        <conv:InverseBoolConverter x:Key="InverseBool" />
+        <conv:NullToVisibilityConverter x:Key="NullToVis" />
+    </Window.Resources>
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
+        <!-- URL row -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Margin="0,0,8,0" VerticalContentAlignment="Center"
+                     Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+            <Button Grid.Column="1" Content="Fetch" Padding="16,6"
+                    Command="{Binding FetchInfoCommand}" />
+        </Grid>
+
+        <!-- Video info -->
+        <StackPanel Grid.Row="1" Margin="0,16,0,0"
+                    Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
+            <TextBlock Text="{Binding VideoInfo.Title}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding VideoInfo.Author}" Opacity="0.7" />
+        </StackPanel>
+
+        <!-- Options -->
+        <StackPanel Grid.Row="2" Margin="0,16,0,0"
+                    Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
+            <TextBlock Text="Format" FontWeight="SemiBold" />
+            <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}" Width="200" HorizontalAlignment="Left" Margin="0,4,0,12" />
+
+            <TextBlock Text="MP3 bitrate" FontWeight="SemiBold"
+                       Visibility="{Binding SelectedMode, Converter={StaticResource NullToVis}}" />
+            <ComboBox ItemsSource="{Binding Bitrates}" SelectedItem="{Binding SelectedBitrate}" Width="200" HorizontalAlignment="Left" Margin="0,4,0,4" />
+
+            <TextBlock Text="{Binding UpscaleWarning}" Foreground="#B36B00" TextWrapping="Wrap"
+                       Visibility="{Binding UpscaleWarning, Converter={StaticResource NullToVis}}" Margin="0,0,0,12" />
+
+            <TextBlock Text="Video quality" FontWeight="SemiBold" />
+            <ComboBox ItemsSource="{Binding VideoInfo.VideoOptions}" SelectedItem="{Binding SelectedVideoQuality}"
+                      DisplayMemberPath="QualityLabel" Width="200" HorizontalAlignment="Left" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <!-- Progress -->
+        <ProgressBar Grid.Row="3" Height="10" Margin="0,12,0,8" Minimum="0" Maximum="1"
+                     Value="{Binding Progress}" />
+
+        <!-- Action + status -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Content="Download" Padding="20,8" FontWeight="Bold"
+                    Command="{Binding DownloadCommand}" />
+        </Grid>
     </Grid>
 </Window>
