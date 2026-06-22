@@ -1,0 +1,12 @@
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\bin\Debug\net8.0\YoutubeDownloader.Core.deps.json
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\bin\Debug\net8.0\YoutubeDownloader.Core.dll
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\bin\Debug\net8.0\YoutubeDownloader.Core.pdb
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.csproj.AssemblyReference.cache
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.AssemblyInfoInputs.cache
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.AssemblyInfo.cs
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.csproj.CoreCompileInputs.cache
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.dll
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\refint\YoutubeDownloader.Core.dll
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\YoutubeDownloader.Core.pdb
+C:\Repos\YoutubeDownloader\YoutubeDownloader.Core\obj\Debug\net8.0\ref\YoutubeDownloader.Core.dll

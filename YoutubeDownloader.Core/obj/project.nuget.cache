@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dgSpecHash": "Qah5ACYWLtw=",
+  "success": true,
+  "projectFilePath": "C:\\Repos\\YoutubeDownloader\\YoutubeDownloader.Core\\YoutubeDownloader.Core.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\anglesharp\\1.4.0\\anglesharp.1.4.0.nupkg.sha512",
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\communitytoolkit.mvvm\\8.4.2\\communitytoolkit.mvvm.8.4.2.nupkg.sha512",
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\jsonextensions\\1.2.0\\jsonextensions.1.2.0.nupkg.sha512",
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\xabe.ffmpeg\\6.0.2\\xabe.ffmpeg.6.0.2.nupkg.sha512",
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\xabe.ffmpeg.downloader\\6.0.2\\xabe.ffmpeg.downloader.6.0.2.nupkg.sha512",
+    "C:\\Users\\VictorBANARD_vg8s0av\\.nuget\\packages\\youtubeexplode\\6.6.0\\youtubeexplode.6.6.0.nupkg.sha512"
+  ],
+  "logs": []
+}

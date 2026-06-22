@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="YoutubeDownloader.App/YoutubeDownloader.App.csproj" />
+  <Project Path="YoutubeDownloader.Core.Tests/YoutubeDownloader.Core.Tests.csproj" />
+  <Project Path="YoutubeDownloader.Core/YoutubeDownloader.Core.csproj" />
+</Solution>
