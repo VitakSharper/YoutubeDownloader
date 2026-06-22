@@ -30,6 +30,7 @@ public partial class App : Application
         services.AddSingleton<ISaveFileService, SaveFileService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
         services.AddSingleton<ILinkOpener, ProcessLinkOpener>();
+        services.AddSingleton<IFileRevealer, ExplorerFileRevealer>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

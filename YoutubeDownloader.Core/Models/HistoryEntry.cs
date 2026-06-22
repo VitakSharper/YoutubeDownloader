@@ -12,9 +12,12 @@ public sealed class HistoryEntry
     /// <summary>Display string for what was produced, e.g. "MP3 · 192 kbps" or "MP4 · 720p".</summary>
     public string Format { get; set; } = "";
 
+    /// <summary>Absolute path of the saved file (empty for entries created before this was tracked).</summary>
+    public string FilePath { get; set; } = "";
+
     public DateTimeOffset DownloadedAt { get; set; }
 
-    /// <summary>Local, human-friendly timestamp for the UI (not persisted).</summary>
+    /// <summary>Local time-of-day for the UI (date is shown in the group header). Not persisted.</summary>
     [JsonIgnore]
-    public string WhenDisplay => DownloadedAt.LocalDateTime.ToString("g", CultureInfo.CurrentCulture);
+    public string TimeDisplay => DownloadedAt.LocalDateTime.ToString("t", CultureInfo.CurrentCulture);
 }

@@ -21,7 +21,7 @@ public class JsonHistoryStoreTests : IDisposable
         var store = new JsonHistoryStore(_dir);
         var entries = new[]
         {
-            new HistoryEntry { Url = "https://youtu.be/aaa", Title = "First", Format = "MP3 · 192 kbps", DownloadedAt = DateTimeOffset.UnixEpoch.AddDays(2) },
+            new HistoryEntry { Url = "https://youtu.be/aaa", Title = "First", Format = "MP3 · 192 kbps", FilePath = @"C:\out\first.mp3", DownloadedAt = DateTimeOffset.UnixEpoch.AddDays(2) },
             new HistoryEntry { Url = "https://youtu.be/bbb", Title = "Second", Format = "MP4 · 720p", DownloadedAt = DateTimeOffset.UnixEpoch.AddDays(1) },
         };
 
@@ -32,6 +32,7 @@ public class JsonHistoryStoreTests : IDisposable
         Assert.Equal("https://youtu.be/aaa", loaded[0].Url);
         Assert.Equal("First", loaded[0].Title);
         Assert.Equal("MP3 · 192 kbps", loaded[0].Format);
+        Assert.Equal(@"C:\out\first.mp3", loaded[0].FilePath);
         Assert.Equal("https://youtu.be/bbb", loaded[1].Url);
     }
 

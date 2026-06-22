@@ -19,9 +19,11 @@ public partial class MainViewModel : ObservableObject
     private readonly ITempFileService _temp;
     private readonly IHistoryStore _history;
     private readonly ILinkOpener _linkOpener;
+    private readonly IFileRevealer _fileRevealer;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
-        ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener)
+        ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
+        IFileRevealer fileRevealer)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -30,13 +32,49 @@ public partial class MainViewModel : ObservableObject
         _temp = temp;
         _history = history;
         _linkOpener = linkOpener;
+        _fileRevealer = fileRevealer;
 
         foreach (var entry in _history.Load())
             History.Add(entry);
+
+        History.CollectionChanged += (_, _) => RebuildHistoryGroups();
+        RebuildHistoryGroups();
     }
 
     /// <summary>Past downloads, most-recent-first.</summary>
     public ObservableCollection<HistoryEntry> History { get; } = new();
+
+    /// <summary>History filtered by <see cref="SearchText"/> and bucketed by date, for the UI.</summary>
+    public ObservableCollection<HistoryGroup> HistoryGroups { get; } = new();
+
+    public string? HistoryPlaceholder =>
+        HistoryGroups.Count > 0
+            ? null
+            : string.IsNullOrWhiteSpace(SearchText)
+                ? "No downloads yet — finished downloads will show up here."
+                : $"No history matches “{SearchText.Trim()}”.";
+
+    private void RebuildHistoryGroups()
+    {
+        IEnumerable<HistoryEntry> entries = History;
+
+        var search = SearchText?.Trim();
+        if (!string.IsNullOrEmpty(search))
+            entries = entries.Where(e =>
+                e.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                e.Url.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var grouped = entries
+            .GroupBy(e => DateOnly.FromDateTime(e.DownloadedAt.LocalDateTime))
+            .Select(g => new HistoryGroup(HistoryDateLabel.For(g.Key, today), g.ToList()));
+
+        HistoryGroups.Clear();
+        foreach (var group in grouped)
+            HistoryGroups.Add(group);
+
+        OnPropertyChanged(nameof(HistoryPlaceholder));
+    }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(FetchInfoCommand))]
@@ -72,6 +110,12 @@ public partial class MainViewModel : ObservableObject
     /// <summary>0 = Download tab, 1 = History tab.</summary>
     [ObservableProperty]
     private int _selectedTabIndex;
+
+    /// <summary>Filter text for the History tab.</summary>
+    [ObservableProperty]
+    private string _searchText = "";
+
+    partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
     public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
@@ -177,7 +221,7 @@ public partial class MainViewModel : ObservableObject
 
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
-            RecordHistory(info.Title, formatLabel);
+            RecordHistory(info.Title, formatLabel, target);
         }
         catch (Exception ex)
         {
@@ -194,13 +238,14 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RecordHistory(string title, string format)
+    private void RecordHistory(string title, string format, string filePath)
     {
         History.Insert(0, new HistoryEntry
         {
             Url = Url,
             Title = title,
             Format = format,
+            FilePath = filePath,
             DownloadedAt = DateTimeOffset.Now
         });
         while (History.Count > MaxHistory)
@@ -231,6 +276,22 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusMessage = $"Couldn't open the browser: {ex.Message}";
+        }
+    }
+
+    /// <summary>Reveal the downloaded file in Explorer.</summary>
+    [RelayCommand]
+    private void OpenFolder(HistoryEntry? entry)
+    {
+        if (entry is null || string.IsNullOrEmpty(entry.FilePath))
+            return;
+        try
+        {
+            _fileRevealer.RevealInFolder(entry.FilePath);
+        }
+        catch
+        {
+            // best-effort: a missing/locked path shouldn't disrupt the UI
         }
     }
 

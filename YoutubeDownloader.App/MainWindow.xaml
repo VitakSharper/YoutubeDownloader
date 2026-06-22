@@ -19,7 +19,7 @@
     <Window.Resources>
         <conv:InverseBoolConverter x:Key="InverseBool" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
-        <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
+        <conv:NonEmptyToVisibilityConverter x:Key="NonEmptyToVis" />
 
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#D8B4FE" />
@@ -289,67 +289,104 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" Margin="2,0,2,10">
-                            <TextBlock Text="Recent downloads" Foreground="#C4B5FD"
-                                       FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                            <Button Content="Clear all" Style="{StaticResource ChipButton}"
-                                    HorizontalAlignment="Right" Margin="0"
+                        <!-- Search + clear -->
+                        <Grid Grid.Row="0" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0" Margin="0,0,10,0">
+                                <TextBox Style="{StaticResource GlassTextBox}"
+                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Search by title or link…" IsHitTestVisible="False"
+                                           Foreground="#9C93C4" FontSize="13" Margin="14,0,0,0"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SearchText}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <Button Grid.Column="1" Content="Clear all" Style="{StaticResource ChipButton}"
+                                    Margin="0" VerticalAlignment="Center"
                                     Command="{Binding ClearHistoryCommand}" />
                         </Grid>
 
-                        <!-- Empty state -->
-                        <TextBlock Grid.Row="1" Text="No downloads yet — finished downloads will show up here."
-                                   Foreground="#A99FD0" FontSize="13" TextWrapping="Wrap"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Visibility="{Binding History.Count, Converter={StaticResource ZeroToVis}}" />
+                        <!-- Empty / no-results state -->
+                        <TextBlock Grid.Row="1" Text="{Binding HistoryPlaceholder}"
+                                   Foreground="#A99FD0" FontSize="13" TextWrapping="Wrap" MaxWidth="360"
+                                   TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding HistoryPlaceholder, Converter={StaticResource NullToVis}}" />
 
-                        <!-- List -->
+                        <!-- Grouped list -->
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
-                            <ItemsControl ItemsSource="{Binding History}">
+                            <ItemsControl ItemsSource="{Binding HistoryGroups}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border CornerRadius="10" Background="#1FFFFFFF" BorderBrush="#2EFFFFFF"
-                                                BorderThickness="1" Padding="13,11" Margin="0,0,0,9">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                                                    <TextBlock Text="{Binding Title}" Foreground="White"
-                                                               FontWeight="SemiBold" FontSize="13"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                                        <Border CornerRadius="5" Background="#3DA855F7"
-                                                                Padding="7,2" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Format}" Foreground="#EDE9FE"
-                                                                       FontSize="10.5" />
+                                        <StackPanel Margin="0,0,0,4">
+                                            <TextBlock Text="{Binding Header}" Foreground="#C4B5FD"
+                                                       FontWeight="SemiBold" FontSize="11.5" Margin="2,6,0,7" />
+                                            <ItemsControl ItemsSource="{Binding Entries}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border CornerRadius="10" Background="#1FFFFFFF"
+                                                                BorderBrush="#2EFFFFFF" BorderThickness="1"
+                                                                Padding="13,11" Margin="0,0,0,9">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                                                    <TextBlock Text="{Binding Title}" Foreground="White"
+                                                                               FontWeight="SemiBold" FontSize="13"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                                        <Border CornerRadius="5" Background="#3DA855F7"
+                                                                                Padding="7,2" VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding Format}" Foreground="#EDE9FE"
+                                                                                       FontSize="10.5" />
+                                                                        </Border>
+                                                                        <TextBlock Text="{Binding TimeDisplay}" Foreground="#A99FD0"
+                                                                                   FontSize="10.5" Margin="8,0,0,0"
+                                                                                   VerticalAlignment="Center" />
+                                                                    </StackPanel>
+                                                                    <TextBlock Text="{Binding Url}" Foreground="#8E86B0"
+                                                                               FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                                                               Margin="0,5,0,0" />
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                                            VerticalAlignment="Center">
+                                                                    <Button Content="Use" Style="{StaticResource ChipButton}"
+                                                                            ToolTip="Put this link back in the download box"
+                                                                            Command="{Binding DataContext.UseEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                            CommandParameter="{Binding}" />
+                                                                    <Button Content="Open" Style="{StaticResource ChipButton}"
+                                                                            ToolTip="Open in browser"
+                                                                            Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                            CommandParameter="{Binding}" />
+                                                                    <Button Content="Folder" Style="{StaticResource ChipButton}"
+                                                                            ToolTip="Show the file in Explorer"
+                                                                            Visibility="{Binding FilePath, Converter={StaticResource NonEmptyToVis}}"
+                                                                            Command="{Binding DataContext.OpenFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                            CommandParameter="{Binding}" />
+                                                                    <Button Content="✕" Style="{StaticResource ChipButton}"
+                                                                            ToolTip="Remove from history"
+                                                                            Command="{Binding DataContext.RemoveEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                                            CommandParameter="{Binding}" />
+                                                                </StackPanel>
+                                                            </Grid>
                                                         </Border>
-                                                        <TextBlock Text="{Binding WhenDisplay}" Foreground="#A99FD0"
-                                                                   FontSize="10.5" Margin="8,0,0,0"
-                                                                   VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding Url}" Foreground="#8E86B0"
-                                                               FontSize="10.5" TextTrimming="CharacterEllipsis"
-                                                               Margin="0,5,0,0" />
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                                            VerticalAlignment="Center">
-                                                    <Button Content="Use" Style="{StaticResource ChipButton}"
-                                                            ToolTip="Put this link back in the download box"
-                                                            Command="{Binding DataContext.UseEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                            CommandParameter="{Binding}" />
-                                                    <Button Content="Open" Style="{StaticResource ChipButton}"
-                                                            ToolTip="Open in browser"
-                                                            Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                            CommandParameter="{Binding}" />
-                                                    <Button Content="✕" Style="{StaticResource ChipButton}"
-                                                            ToolTip="Remove from history"
-                                                            Command="{Binding DataContext.RemoveEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                            CommandParameter="{Binding}" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

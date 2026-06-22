@@ -15,6 +15,7 @@ public class MainViewModelTests
     private readonly Mock<ITempFileService> _temp = new();
     private readonly Mock<IHistoryStore> _history = new();
     private readonly Mock<ILinkOpener> _linkOpener = new();
+    private readonly Mock<IFileRevealer> _fileRevealer = new();
 
     public MainViewModelTests()
     {
@@ -23,7 +24,7 @@ public class MainViewModelTests
 
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object);
+            _history.Object, _linkOpener.Object, _fileRevealer.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",
@@ -198,6 +199,7 @@ public class MainViewModelTests
         Assert.Equal("https://youtu.be/dQw4w9WgXcQ", entry.Url);
         Assert.Equal("Test Video", entry.Title);
         Assert.Equal("MP3 · 256 kbps", entry.Format);
+        Assert.Equal(@"C:\out\song.mp3", entry.FilePath);
         _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
     }
 
@@ -288,5 +290,70 @@ public class MainViewModelTests
 
         Assert.Empty(vm.History);
         _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
+    }
+
+    [Fact]
+    public void HistoryGroups_BucketByDate_TodayAndYesterday()
+    {
+        var now = DateTimeOffset.Now;
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = "a", Title = "Alpha", DownloadedAt = now },
+            new() { Url = "b", Title = "Beta",  DownloadedAt = now.AddDays(-1) },
+            new() { Url = "c", Title = "Gamma", DownloadedAt = now.AddDays(-1) },
+        });
+
+        var vm = CreateSut();
+
+        Assert.Equal(2, vm.HistoryGroups.Count);
+        Assert.Equal("Today", vm.HistoryGroups[0].Header);
+        Assert.Single(vm.HistoryGroups[0].Entries);
+        Assert.Equal("Yesterday", vm.HistoryGroups[1].Header);
+        Assert.Equal(2, vm.HistoryGroups[1].Entries.Count);
+    }
+
+    [Fact]
+    public void SearchText_FiltersByTitleAndUrl_AndSetsPlaceholder()
+    {
+        var now = DateTimeOffset.Now;
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = "https://y/1",    Title = "Lofi beats",  DownloadedAt = now },
+            new() { Url = "https://y/rick", Title = "Never Gonna", DownloadedAt = now },
+        });
+        var vm = CreateSut();
+        Assert.Equal(2, vm.HistoryGroups.Sum(g => g.Entries.Count));
+        Assert.Null(vm.HistoryPlaceholder);
+
+        vm.SearchText = "lofi"; // matches title (case-insensitive)
+        Assert.Equal(1, vm.HistoryGroups.Sum(g => g.Entries.Count));
+        Assert.Equal("Lofi beats", vm.HistoryGroups[0].Entries[0].Title);
+
+        vm.SearchText = "rick"; // matches URL
+        Assert.Equal(1, vm.HistoryGroups.Sum(g => g.Entries.Count));
+
+        vm.SearchText = "nothing-here";
+        Assert.Empty(vm.HistoryGroups);
+        Assert.NotNull(vm.HistoryPlaceholder);
+    }
+
+    [Fact]
+    public void OpenFolder_WithPath_RevealsFile()
+    {
+        var vm = CreateSut();
+
+        vm.OpenFolderCommand.Execute(new HistoryEntry { FilePath = @"C:\out\song.mp3" });
+
+        _fileRevealer.Verify(r => r.RevealInFolder(@"C:\out\song.mp3"), Times.Once);
+    }
+
+    [Fact]
+    public void OpenFolder_WithoutPath_DoesNothing()
+    {
+        var vm = CreateSut();
+
+        vm.OpenFolderCommand.Execute(new HistoryEntry { FilePath = "" });
+
+        _fileRevealer.Verify(r => r.RevealInFolder(It.IsAny<string>()), Times.Never);
     }
 }
