@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32;
 using YoutubeDownloader.Core.Services;
 
@@ -5,7 +6,7 @@ namespace YoutubeDownloader.App.Services;
 
 public sealed class SaveFileService : ISaveFileService
 {
-    public string? PromptForSavePath(string suggestedFileName, string extension)
+    public string? PromptForSavePath(string suggestedFileName, string extension, string? initialDirectory)
     {
         var dialog = new SaveFileDialog
         {
@@ -17,6 +18,9 @@ public sealed class SaveFileService : ISaveFileService
             AddExtension = true,
             OverwritePrompt = true
         };
+
+        if (!string.IsNullOrEmpty(initialDirectory) && Directory.Exists(initialDirectory))
+            dialog.InitialDirectory = initialDirectory;
 
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }

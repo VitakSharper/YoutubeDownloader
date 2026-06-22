@@ -123,7 +123,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3")).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -144,7 +144,7 @@ public class MainViewModelTests
     {
         var info = SampleInfo();
         _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), It.IsAny<string>())).Returns((string?)null);
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).Returns((string?)null);
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -165,7 +165,7 @@ public class MainViewModelTests
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.SetupSequence(t => t.NewTempFile(It.IsAny<string>()))
              .Returns(@"C:\temp\v.mp4").Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp4")).Returns(@"C:\out\clip.mp4");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp4", It.IsAny<string?>())).Returns(@"C:\out\clip.mp4");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -188,7 +188,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3")).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -213,7 +213,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3")).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
         _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
@@ -381,5 +381,42 @@ public class MainViewModelTests
         vm.AlwaysOnTop = false;
 
         _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.AlwaysOnTop == false)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_PassesRememberedFolderToSaveDialog()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastSaveFolder = @"C:\Music" });
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", @"C:\Music")).Returns(@"C:\Music\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _saveFile.Verify(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", @"C:\Music"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_UpdatesLastSaveFolderToChosenLocation()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.LastSaveFolder == @"C:\out")), Times.Once);
     }
 }

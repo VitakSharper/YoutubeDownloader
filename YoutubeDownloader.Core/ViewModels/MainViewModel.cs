@@ -185,12 +185,14 @@ public partial class MainViewModel : ObservableObject
         var ext = isAudio ? "mp3" : "mp4";
         var suggested = $"{FileNameSanitizer.Sanitize(info.Title)}.{ext}";
 
-        var target = _saveFile.PromptForSavePath(suggested, ext);
+        var target = _saveFile.PromptForSavePath(suggested, ext, _appSettings.LastSaveFolder);
         if (target is null)
         {
             StatusMessage = "Download cancelled.";
             return;
         }
+
+        RememberSaveFolder(target);
 
         var tempFiles = new List<string>();
         string formatLabel = "";
@@ -251,6 +253,16 @@ public partial class MainViewModel : ObservableObject
                 try { if (File.Exists(f)) File.Delete(f); }
                 catch { /* best-effort temp cleanup */ }
             }
+        }
+    }
+
+    private void RememberSaveFolder(string target)
+    {
+        var folder = Path.GetDirectoryName(target);
+        if (!string.IsNullOrEmpty(folder) && folder != _appSettings.LastSaveFolder)
+        {
+            _appSettings.LastSaveFolder = folder;
+            _settings.Save(_appSettings);
         }
     }
 
