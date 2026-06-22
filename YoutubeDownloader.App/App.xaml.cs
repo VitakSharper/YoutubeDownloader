@@ -15,9 +15,10 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var ffmpegDir = Path.Combine(
+        var baseDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "YoutubeDownloader", "ffmpeg");
+            "YoutubeDownloader");
+        var ffmpegDir = Path.Combine(baseDir, "ffmpeg");
 
         var services = new ServiceCollection();
         services.AddSingleton<IYouTubeService, YoutubeExplodeService>();
@@ -27,6 +28,8 @@ public partial class App : Application
         services.AddSingleton<IMediaConverter, FFmpegMediaConverter>();
         services.AddSingleton<ITempFileService, TempFileService>();
         services.AddSingleton<ISaveFileService, SaveFileService>();
+        services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
+        services.AddSingleton<ILinkOpener, ProcessLinkOpener>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

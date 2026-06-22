@@ -13,9 +13,17 @@ public class MainViewModelTests
     private readonly Mock<IMediaConverter> _converter = new();
     private readonly Mock<ISaveFileService> _saveFile = new();
     private readonly Mock<ITempFileService> _temp = new();
+    private readonly Mock<IHistoryStore> _history = new();
+    private readonly Mock<ILinkOpener> _linkOpener = new();
+
+    public MainViewModelTests()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>());
+    }
 
     private MainViewModel CreateSut() =>
-        new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object);
+        new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
+            _history.Object, _linkOpener.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",
@@ -167,5 +175,118 @@ public class MainViewModelTests
             It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         _converter.Verify(c => c.MuxToMp4Async(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\v.mp4", @"C:\temp\a.webm",
             @"C:\out\clip.mp4", info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_AudioMode_RecordsHistoryEntry()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3")).Returns(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedBitrate = Mp3Bitrate.Kbps256;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        var entry = Assert.Single(vm.History);
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", entry.Url);
+        Assert.Equal("Test Video", entry.Title);
+        Assert.Equal("MP3 · 256 kbps", entry.Format);
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_Failure_DoesNotRecordHistory()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3")).Returns(@"C:\out\song.mp3");
+        _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Empty(vm.History);
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Never);
+    }
+
+    [Fact]
+    public void Constructor_LoadsExistingHistory()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = "u1", Title = "t1", Format = "MP3 · 192 kbps" },
+            new() { Url = "u2", Title = "t2", Format = "MP4 · 720p" },
+        });
+
+        var vm = CreateSut();
+
+        Assert.Equal(2, vm.History.Count);
+        Assert.Equal("u1", vm.History[0].Url);
+    }
+
+    [Fact]
+    public void UseEntry_SetsUrlAndSwitchesToDownloadTab()
+    {
+        var vm = CreateSut();
+        vm.SelectedTabIndex = 1;
+
+        vm.UseEntryCommand.Execute(new HistoryEntry { Url = "https://youtu.be/zzz" });
+
+        Assert.Equal("https://youtu.be/zzz", vm.Url);
+        Assert.Equal(0, vm.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void OpenInBrowser_CallsLinkOpener()
+    {
+        var vm = CreateSut();
+
+        vm.OpenInBrowserCommand.Execute(new HistoryEntry { Url = "https://youtu.be/zzz" });
+
+        _linkOpener.Verify(o => o.Open("https://youtu.be/zzz"), Times.Once);
+    }
+
+    [Fact]
+    public void RemoveEntry_RemovesAndSaves()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = "u1" }, new() { Url = "u2" },
+        });
+        var vm = CreateSut();
+        var first = vm.History[0];
+
+        vm.RemoveEntryCommand.Execute(first);
+
+        Assert.Single(vm.History);
+        Assert.DoesNotContain(first, vm.History);
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
+    }
+
+    [Fact]
+    public void ClearHistory_EmptiesAndSaves()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry> { new() { Url = "u1" } });
+        var vm = CreateSut();
+
+        vm.ClearHistoryCommand.Execute(null);
+
+        Assert.Empty(vm.History);
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -9,21 +10,33 @@ namespace YoutubeDownloader.Core.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
+    private const int MaxHistory = 100;
+
     private readonly IYouTubeService _youtube;
     private readonly IFFmpegLocator _ffmpeg;
     private readonly IMediaConverter _converter;
     private readonly ISaveFileService _saveFile;
     private readonly ITempFileService _temp;
+    private readonly IHistoryStore _history;
+    private readonly ILinkOpener _linkOpener;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
-        ISaveFileService saveFile, ITempFileService temp)
+        ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
         _converter = converter;
         _saveFile = saveFile;
         _temp = temp;
+        _history = history;
+        _linkOpener = linkOpener;
+
+        foreach (var entry in _history.Load())
+            History.Add(entry);
     }
+
+    /// <summary>Past downloads, most-recent-first.</summary>
+    public ObservableCollection<HistoryEntry> History { get; } = new();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(FetchInfoCommand))]
@@ -55,6 +68,10 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private VideoStreamOption? _selectedVideoQuality;
+
+    /// <summary>0 = Download tab, 1 = History tab.</summary>
+    [ObservableProperty]
+    private int _selectedTabIndex;
 
     public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
@@ -116,6 +133,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         var tempFiles = new List<string>();
+        string formatLabel = "";
         try
         {
             IsBusy = true;
@@ -135,10 +153,12 @@ public partial class MainViewModel : ObservableObject
                 StatusMessage = $"Converting to MP3 ({(int)SelectedBitrate} kbps)…";
                 await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, (int)SelectedBitrate,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), CancellationToken.None);
+                formatLabel = $"MP3 · {(int)SelectedBitrate} kbps";
             }
             else
             {
                 var quality = SelectedVideoQuality ?? info.VideoOptions.First();
+                formatLabel = $"MP4 · {quality.QualityLabel}";
                 StatusMessage = $"Downloading video ({quality.QualityLabel})…";
                 var tempVideo = _temp.NewTempFile(quality.Container);
                 tempFiles.Add(tempVideo);
@@ -157,6 +177,7 @@ public partial class MainViewModel : ObservableObject
 
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
+            RecordHistory(info.Title, formatLabel);
         }
         catch (Exception ex)
         {
@@ -171,5 +192,62 @@ public partial class MainViewModel : ObservableObject
                 catch { /* best-effort temp cleanup */ }
             }
         }
+    }
+
+    private void RecordHistory(string title, string format)
+    {
+        History.Insert(0, new HistoryEntry
+        {
+            Url = Url,
+            Title = title,
+            Format = format,
+            DownloadedAt = DateTimeOffset.Now
+        });
+        while (History.Count > MaxHistory)
+            History.RemoveAt(History.Count - 1);
+        _history.Save(History);
+    }
+
+    /// <summary>Re-load a past link into the URL box and switch to the Download tab.</summary>
+    [RelayCommand]
+    private void UseEntry(HistoryEntry? entry)
+    {
+        if (entry is null)
+            return;
+        Url = entry.Url;
+        SelectedTabIndex = 0;
+    }
+
+    /// <summary>Open a past link in the default browser.</summary>
+    [RelayCommand]
+    private void OpenInBrowser(HistoryEntry? entry)
+    {
+        if (entry is null)
+            return;
+        try
+        {
+            _linkOpener.Open(entry.Url);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Couldn't open the browser: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveEntry(HistoryEntry? entry)
+    {
+        if (entry is null || !History.Remove(entry))
+            return;
+        _history.Save(History);
+    }
+
+    [RelayCommand]
+    private void ClearHistory()
+    {
+        if (History.Count == 0)
+            return;
+        History.Clear();
+        _history.Save(History);
     }
 }

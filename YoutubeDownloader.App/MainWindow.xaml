@@ -4,7 +4,7 @@
         xmlns:conv="clr-namespace:YoutubeDownloader.App.Converters"
         Title="Liudochka Youtube Downloader"
         Icon="app.ico"
-        Height="600" Width="660" MinWidth="560" MinHeight="540"
+        Height="640" Width="680" MinWidth="580" MinHeight="560"
         WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI" TextOptions.TextFormattingMode="Ideal">
 
@@ -19,8 +19,8 @@
     <Window.Resources>
         <conv:InverseBoolConverter x:Key="InverseBool" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
+        <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
 
-        <!-- Section label -->
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#D8B4FE" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -101,6 +101,73 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Small ghost button (history actions) -->
+        <Style x:Key="ChipButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="11,5" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="7" Background="#2EFFFFFF"
+                                BorderBrush="#3DFFFFFF" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#4DFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Pill tab headers -->
+        <Style x:Key="PillTab" TargetType="TabItem">
+            <Setter Property="Foreground" Value="#C4B5FD" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="bd" CornerRadius="9" Padding="18,7" Margin="0,0,8,0"
+                                Background="#1FFFFFFF" BorderThickness="0">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter TargetName="bd" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#EC4899" Offset="0" />
+                                            <GradientStop Color="#8B5CF6" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
     </Window.Resources>
 
     <!-- Frosted card -->
@@ -109,15 +176,11 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,18">
+            <!-- Branded header (shared across tabs) -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                 <Image Source="app.ico" Width="46" Height="46"
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
@@ -130,77 +193,170 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- URL row -->
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" Margin="0,0,10,0" Style="{StaticResource GlassTextBox}"
-                         Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
-                <Button Grid.Column="1" Content="Fetch" Style="{StaticResource AccentButton}"
-                        Command="{Binding FetchInfoCommand}" />
-            </Grid>
+            <!-- Tabs -->
+            <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
-            <!-- Video info -->
-            <Border Grid.Row="2" Margin="0,16,0,0" CornerRadius="12" Padding="14,11"
-                    Background="#1FFFFFFF" BorderBrush="#2EFFFFFF" BorderThickness="1"
-                    Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
-                <StackPanel>
-                    <TextBlock Text="{Binding VideoInfo.Title}" Foreground="White"
-                               FontSize="15" FontWeight="Bold" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding VideoInfo.Author}" Foreground="#CBD5E1"
-                               FontSize="12" Margin="0,3,0,0" />
-                </StackPanel>
-            </Border>
+                <!-- ===== DOWNLOAD ===== -->
+                <TabItem Header="Download" Style="{StaticResource PillTab}">
+                    <Grid Margin="0,16,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-            <!-- Options -->
-            <StackPanel Grid.Row="3" Margin="0,18,0,0"
-                        Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
-                <TextBlock Text="FORMAT" Style="{StaticResource Label}" />
-                <ComboBox Style="{StaticResource Combo}" Margin="0,0,0,14"
-                          ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}" />
+                        <!-- URL row -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Margin="0,0,10,0" Style="{StaticResource GlassTextBox}"
+                                     Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                            <Button Grid.Column="1" Content="Fetch" Style="{StaticResource AccentButton}"
+                                    Command="{Binding FetchInfoCommand}" />
+                        </Grid>
 
-                <TextBlock Text="MP3 BITRATE" Style="{StaticResource Label}" />
-                <ComboBox Style="{StaticResource Combo}" Margin="0,0,0,6"
-                          ItemsSource="{Binding Bitrates}" SelectedItem="{Binding SelectedBitrate}" />
+                        <!-- Video info -->
+                        <Border Grid.Row="1" Margin="0,16,0,0" CornerRadius="12" Padding="14,11"
+                                Background="#1FFFFFFF" BorderBrush="#2EFFFFFF" BorderThickness="1"
+                                Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding VideoInfo.Title}" Foreground="White"
+                                           FontSize="15" FontWeight="Bold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding VideoInfo.Author}" Foreground="#CBD5E1"
+                                           FontSize="12" Margin="0,3,0,0" />
+                            </StackPanel>
+                        </Border>
 
-                <Border CornerRadius="8" Background="#33F59E0B" Padding="10,7" Margin="0,2,0,14"
-                        Visibility="{Binding UpscaleWarning, Converter={StaticResource NullToVis}}">
-                    <TextBlock Text="{Binding UpscaleWarning}" Foreground="#FCD34D"
-                               FontSize="12" TextWrapping="Wrap" />
-                </Border>
+                        <!-- Options -->
+                        <StackPanel Grid.Row="2" Margin="0,18,0,0"
+                                    Visibility="{Binding VideoInfo, Converter={StaticResource NullToVis}}">
+                            <TextBlock Text="FORMAT" Style="{StaticResource Label}" />
+                            <ComboBox Style="{StaticResource Combo}" Margin="0,0,0,14"
+                                      ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}" />
 
-                <TextBlock Text="VIDEO QUALITY" Style="{StaticResource Label}" />
-                <ComboBox Style="{StaticResource Combo}"
-                          ItemsSource="{Binding VideoInfo.VideoOptions}"
-                          SelectedItem="{Binding SelectedVideoQuality}"
-                          DisplayMemberPath="QualityLabel" />
-            </StackPanel>
+                            <TextBlock Text="MP3 BITRATE" Style="{StaticResource Label}" />
+                            <ComboBox Style="{StaticResource Combo}" Margin="0,0,0,6"
+                                      ItemsSource="{Binding Bitrates}" SelectedItem="{Binding SelectedBitrate}" />
 
-            <!-- Progress -->
-            <ProgressBar Grid.Row="4" Height="8" Margin="0,18,0,10" Minimum="0" Maximum="1"
-                         BorderThickness="0" Background="#22FFFFFF" Value="{Binding Progress}">
-                <ProgressBar.Foreground>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#22D3EE" Offset="0" />
-                        <GradientStop Color="#A855F7" Offset="1" />
-                    </LinearGradientBrush>
-                </ProgressBar.Foreground>
-            </ProgressBar>
+                            <Border CornerRadius="8" Background="#33F59E0B" Padding="10,7" Margin="0,2,0,14"
+                                    Visibility="{Binding UpscaleWarning, Converter={StaticResource NullToVis}}">
+                                <TextBlock Text="{Binding UpscaleWarning}" Foreground="#FCD34D"
+                                           FontSize="12" TextWrapping="Wrap" />
+                            </Border>
 
-            <!-- Status + action -->
-            <Grid Grid.Row="5">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="#CBD5E1"
-                           FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
-                <Button Grid.Column="1" Content="Download" Style="{StaticResource AccentButton}"
-                        Padding="26,10" Command="{Binding DownloadCommand}" />
-            </Grid>
+                            <TextBlock Text="VIDEO QUALITY" Style="{StaticResource Label}" />
+                            <ComboBox Style="{StaticResource Combo}"
+                                      ItemsSource="{Binding VideoInfo.VideoOptions}"
+                                      SelectedItem="{Binding SelectedVideoQuality}"
+                                      DisplayMemberPath="QualityLabel" />
+                        </StackPanel>
+
+                        <!-- Progress -->
+                        <ProgressBar Grid.Row="3" Height="8" Margin="0,18,0,10" Minimum="0" Maximum="1"
+                                     BorderThickness="0" Background="#22FFFFFF" Value="{Binding Progress}">
+                            <ProgressBar.Foreground>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#22D3EE" Offset="0" />
+                                    <GradientStop Color="#A855F7" Offset="1" />
+                                </LinearGradientBrush>
+                            </ProgressBar.Foreground>
+                        </ProgressBar>
+
+                        <!-- Status + action -->
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="#CBD5E1"
+                                       FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                            <Button Grid.Column="1" Content="Download" Style="{StaticResource AccentButton}"
+                                    Padding="26,10" Command="{Binding DownloadCommand}" />
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ===== HISTORY ===== -->
+                <TabItem Header="History" Style="{StaticResource PillTab}">
+                    <Grid Margin="0,16,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="2,0,2,10">
+                            <TextBlock Text="Recent downloads" Foreground="#C4B5FD"
+                                       FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                            <Button Content="Clear all" Style="{StaticResource ChipButton}"
+                                    HorizontalAlignment="Right" Margin="0"
+                                    Command="{Binding ClearHistoryCommand}" />
+                        </Grid>
+
+                        <!-- Empty state -->
+                        <TextBlock Grid.Row="1" Text="No downloads yet — finished downloads will show up here."
+                                   Foreground="#A99FD0" FontSize="13" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding History.Count, Converter={StaticResource ZeroToVis}}" />
+
+                        <!-- List -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                            <ItemsControl ItemsSource="{Binding History}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="10" Background="#1FFFFFFF" BorderBrush="#2EFFFFFF"
+                                                BorderThickness="1" Padding="13,11" Margin="0,0,0,9">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Title}" Foreground="White"
+                                                               FontWeight="SemiBold" FontSize="13"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                        <Border CornerRadius="5" Background="#3DA855F7"
+                                                                Padding="7,2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Format}" Foreground="#EDE9FE"
+                                                                       FontSize="10.5" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding WhenDisplay}" Foreground="#A99FD0"
+                                                                   FontSize="10.5" Margin="8,0,0,0"
+                                                                   VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Url}" Foreground="#8E86B0"
+                                                               FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                                               Margin="0,5,0,0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                            VerticalAlignment="Center">
+                                                    <Button Content="Use" Style="{StaticResource ChipButton}"
+                                                            ToolTip="Put this link back in the download box"
+                                                            Command="{Binding DataContext.UseEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                            CommandParameter="{Binding}" />
+                                                    <Button Content="Open" Style="{StaticResource ChipButton}"
+                                                            ToolTip="Open in browser"
+                                                            Command="{Binding DataContext.OpenInBrowserCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                            CommandParameter="{Binding}" />
+                                                    <Button Content="✕" Style="{StaticResource ChipButton}"
+                                                            ToolTip="Remove from history"
+                                                            Command="{Binding DataContext.RemoveEntryCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                            CommandParameter="{Binding}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+            </TabControl>
         </Grid>
     </Border>
 </Window>
