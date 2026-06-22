@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Resource Include="app.ico" />
+    <Resource Include="Assets\cassette.png" />
   </ItemGroup>
 
 </Project>

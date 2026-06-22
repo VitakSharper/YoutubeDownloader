@@ -115,6 +115,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = "";
 
+    /// <summary>Keep the window above other windows (on by default).</summary>
+    [ObservableProperty]
+    private bool _alwaysOnTop = true;
+
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
     public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();

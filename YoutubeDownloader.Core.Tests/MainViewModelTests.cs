@@ -356,4 +356,10 @@ public class MainViewModelTests
 
         _fileRevealer.Verify(r => r.RevealInFolder(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public void AlwaysOnTop_DefaultsToTrue()
+    {
+        Assert.True(CreateSut().AlwaysOnTop);
+    }
 }

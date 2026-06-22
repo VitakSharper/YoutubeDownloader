@@ -6,6 +6,7 @@
         Icon="app.ico"
         Height="640" Width="680" MinWidth="580" MinHeight="560"
         WindowStartupLocation="CenterScreen"
+        Topmost="{Binding AlwaysOnTop}"
         FontFamily="Segoe UI" TextOptions.TextFormattingMode="Ideal">
 
     <Window.Background>
@@ -170,9 +171,15 @@
         </Style>
     </Window.Resources>
 
-    <!-- Frosted card -->
-    <Border Margin="18" CornerRadius="18" Background="#591A0F33"
-            BorderBrush="#40FFFFFF" BorderThickness="1" Padding="24">
+    <Grid>
+        <!-- Cassette background motif (behind the card) -->
+        <Image Source="Assets/cassette.png" Stretch="Uniform" Opacity="0.55"
+               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+
+        <!-- Frosted card -->
+        <Border Margin="18" CornerRadius="18" Background="#42140A2E"
+                BorderBrush="#40FFFFFF" BorderThickness="1" Padding="24">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -180,18 +187,24 @@
             </Grid.RowDefinitions>
 
             <!-- Branded header (shared across tabs) -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                <Image Source="app.ico" Width="46" Height="46"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
-                    <TextBlock FontSize="21">
-                        <Run Text="Liudochka" FontWeight="Bold" Foreground="#F0ABFC" />
-                        <Run Text=" Youtube Downloader" FontWeight="SemiBold" Foreground="White" />
-                    </TextBlock>
-                    <TextBlock Text="Grab audio &amp; video from any YouTube link"
-                               FontSize="11.5" Foreground="#C4B5FD" Margin="0,2,0,0" />
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <StackPanel Orientation="Horizontal">
+                    <Image Source="app.ico" Width="46" Height="46"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
+                        <TextBlock FontSize="21">
+                            <Run Text="Liudochka" FontWeight="Bold" Foreground="#F0ABFC" />
+                            <Run Text=" Youtube Downloader" FontWeight="SemiBold" Foreground="White" />
+                        </TextBlock>
+                        <TextBlock Text="Grab audio &amp; video from any YouTube link"
+                                   FontSize="11.5" Foreground="#C4B5FD" Margin="0,2,0,0" />
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+                <CheckBox Content="Always on top" IsChecked="{Binding AlwaysOnTop}"
+                          HorizontalAlignment="Right" VerticalAlignment="Center"
+                          Foreground="#E9D5FF" FontSize="11.5" Cursor="Hand"
+                          ToolTip="Keep this window above other windows" />
+            </Grid>
 
             <!-- Tabs -->
             <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
@@ -395,5 +408,6 @@
                 </TabItem>
             </TabControl>
         </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </Window>
