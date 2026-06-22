@@ -1,3 +1,4 @@
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YoutubeDownloader.Core.Helpers;
@@ -114,6 +115,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        var tempFiles = new List<string>();
         try
         {
             IsBusy = true;
@@ -126,6 +128,7 @@ public partial class MainViewModel : ObservableObject
             {
                 StatusMessage = "Downloading audio…";
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
+                tempFiles.Add(tempAudio);
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), CancellationToken.None);
 
@@ -138,7 +141,9 @@ public partial class MainViewModel : ObservableObject
                 var quality = SelectedVideoQuality ?? info.VideoOptions.First();
                 StatusMessage = $"Downloading video ({quality.QualityLabel})…";
                 var tempVideo = _temp.NewTempFile(quality.Container);
+                tempFiles.Add(tempVideo);
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
+                tempFiles.Add(tempAudio);
 
                 await _youtube.DownloadStreamAsync(quality.Source, tempVideo,
                     new Progress<double>(p => Progress = 0.1 + p * 0.4), CancellationToken.None);
@@ -160,6 +165,11 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            foreach (var f in tempFiles)
+            {
+                try { if (File.Exists(f)) File.Delete(f); }
+                catch { /* best-effort temp cleanup */ }
+            }
         }
     }
 }
