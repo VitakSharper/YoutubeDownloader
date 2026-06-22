@@ -16,15 +16,17 @@ public class MainViewModelTests
     private readonly Mock<IHistoryStore> _history = new();
     private readonly Mock<ILinkOpener> _linkOpener = new();
     private readonly Mock<IFileRevealer> _fileRevealer = new();
+    private readonly Mock<ISettingsStore> _settings = new();
 
     public MainViewModelTests()
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>());
+        _settings.Setup(s => s.Load()).Returns(new AppSettings());
     }
 
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object, _fileRevealer.Object);
+            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",
@@ -361,5 +363,23 @@ public class MainViewModelTests
     public void AlwaysOnTop_DefaultsToTrue()
     {
         Assert.True(CreateSut().AlwaysOnTop);
+    }
+
+    [Fact]
+    public void Constructor_LoadsAlwaysOnTopFromSettings()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { AlwaysOnTop = false });
+
+        Assert.False(CreateSut().AlwaysOnTop);
+    }
+
+    [Fact]
+    public void AlwaysOnTop_WhenChanged_PersistsSetting()
+    {
+        var vm = CreateSut(); // loaded default (true), no save during construction
+
+        vm.AlwaysOnTop = false;
+
+        _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.AlwaysOnTop == false)), Times.Once);
     }
 }

@@ -20,10 +20,12 @@ public partial class MainViewModel : ObservableObject
     private readonly IHistoryStore _history;
     private readonly ILinkOpener _linkOpener;
     private readonly IFileRevealer _fileRevealer;
+    private readonly ISettingsStore _settings;
+    private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
-        IFileRevealer fileRevealer)
+        IFileRevealer fileRevealer, ISettingsStore settings)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -33,6 +35,10 @@ public partial class MainViewModel : ObservableObject
         _history = history;
         _linkOpener = linkOpener;
         _fileRevealer = fileRevealer;
+        _settings = settings;
+
+        _appSettings = _settings.Load();
+        _alwaysOnTop = _appSettings.AlwaysOnTop;
 
         foreach (var entry in _history.Load())
             History.Add(entry);
@@ -118,6 +124,12 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Keep the window above other windows (on by default).</summary>
     [ObservableProperty]
     private bool _alwaysOnTop = true;
+
+    partial void OnAlwaysOnTopChanged(bool value)
+    {
+        _appSettings.AlwaysOnTop = value;
+        _settings.Save(_appSettings);
+    }
 
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
