@@ -6,8 +6,7 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![UI](https://img.shields.io/badge/UI-WPF%20%2B%20MVVM-2C3E50)
 
-<!-- Add a screenshot: save a PNG to docs/screenshot.png, then uncomment the line below -->
-<!-- ![Screenshot](docs/screenshot.png) -->
+![Liudochka Youtube Downloader](docs/screenshot.png)
 
 ## Features
 
