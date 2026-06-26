@@ -21,11 +21,12 @@ public partial class MainViewModel : ObservableObject
     private readonly ILinkOpener _linkOpener;
     private readonly IFileRevealer _fileRevealer;
     private readonly ISettingsStore _settings;
+    private readonly IClipboardService _clipboard;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
-        IFileRevealer fileRevealer, ISettingsStore settings)
+        IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -36,6 +37,7 @@ public partial class MainViewModel : ObservableObject
         _linkOpener = linkOpener;
         _fileRevealer = fileRevealer;
         _settings = settings;
+        _clipboard = clipboard;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -131,6 +133,13 @@ public partial class MainViewModel : ObservableObject
         _settings.Save(_appSettings);
     }
 
+    /// <summary>A YouTube link detected on the clipboard, surfaced as a suggestion. Null hides the banner.</summary>
+    [ObservableProperty]
+    private string? _detectedClipboardUrl;
+
+    /// <summary>Video id of the last suggestion the user used or dismissed, so it is not re-offered.</summary>
+    private string? _dismissedVideoId;
+
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
     public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();
@@ -175,6 +184,57 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Inspect the clipboard and surface a YouTube link as a suggestion when it is new.
+    /// Called when the window gains focus.
+    /// </summary>
+    [RelayCommand]
+    private void CheckClipboard()
+    {
+        if (IsBusy)
+        {
+            DetectedClipboardUrl = null;
+            return;
+        }
+
+        var text = _clipboard.GetText();
+        var videoId = YouTubeUrlValidator.GetVideoId(text);
+
+        if (videoId is null
+            || videoId == YouTubeUrlValidator.GetVideoId(Url)
+            || videoId == _dismissedVideoId)
+        {
+            DetectedClipboardUrl = null;
+            return;
+        }
+
+        DetectedClipboardUrl = text;
+    }
+
+    /// <summary>Dismiss the current suggestion and suppress this same link from reappearing.</summary>
+    [RelayCommand]
+    private void DismissDetectedLink()
+    {
+        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(DetectedClipboardUrl);
+        DetectedClipboardUrl = null;
+    }
+
+    /// <summary>Accept the suggested link: fill the box, suppress re-offering it, then fetch its info.</summary>
+    [RelayCommand]
+    private async Task UseDetectedLinkAsync()
+    {
+        var link = DetectedClipboardUrl;
+        if (string.IsNullOrWhiteSpace(link))
+            return;
+
+        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(link);
+        DetectedClipboardUrl = null;
+        Url = link;
+
+        if (FetchInfoCommand.CanExecute(null))
+            await FetchInfoCommand.ExecuteAsync(null);
     }
 
     [RelayCommand(CanExecute = nameof(CanDownload))]

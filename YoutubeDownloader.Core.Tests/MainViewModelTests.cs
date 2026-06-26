@@ -17,6 +17,7 @@ public class MainViewModelTests
     private readonly Mock<ILinkOpener> _linkOpener = new();
     private readonly Mock<IFileRevealer> _fileRevealer = new();
     private readonly Mock<ISettingsStore> _settings = new();
+    private readonly Mock<IClipboardService> _clipboard = new();
 
     public MainViewModelTests()
     {
@@ -26,7 +27,7 @@ public class MainViewModelTests
 
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object);
+            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",
@@ -418,5 +419,144 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.LastSaveFolder == @"C:\out")), Times.Once);
+    }
+
+    [Fact]
+    public void CheckClipboard_ValidNewLink_SetsSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_NonYouTubeText_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("just some text");
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_EmptyClipboard_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns((string?)null);
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_LinkSameVideoAsUrlBox_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.Url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"; // same video, different URL form
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_WhileBusy_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsBusy))!.SetValue(vm, true);
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void DismissDetectedLink_HidesSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        Assert.NotNull(vm.DetectedClipboardUrl);
+
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_AfterDismiss_SameLinkStaysSuppressed()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        vm.CheckClipboardCommand.Execute(null); // same link still on clipboard
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_AfterDismiss_DifferentLinkReappears()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/oHg5SJYRHA0");
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Equal("https://youtu.be/oHg5SJYRHA0", vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public async Task UseDetectedLink_SetsUrlClearsBannerAndFetches()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", vm.Url);
+        Assert.Null(vm.DetectedClipboardUrl);
+        Assert.Same(info, vm.VideoInfo);
+        _youtube.Verify(s => s.GetVideoInfoAsync("https://youtu.be/dQw4w9WgXcQ", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UseDetectedLink_NoSuggestion_DoesNothing()
+    {
+        var vm = CreateSut(); // DetectedClipboardUrl is null
+
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        Assert.Equal("", vm.Url);
+        _youtube.Verify(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UseDetectedLink_ThenCheckClipboard_DoesNotReappear()
+    {
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(SampleInfo());
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        vm.CheckClipboardCommand.Execute(null); // same link still on clipboard
+
+        Assert.Null(vm.DetectedClipboardUrl);
     }
 }
