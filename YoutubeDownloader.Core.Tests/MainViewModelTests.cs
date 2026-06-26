@@ -477,4 +477,44 @@ public class MainViewModelTests
 
         Assert.Null(vm.DetectedClipboardUrl);
     }
+
+    [Fact]
+    public void DismissDetectedLink_HidesSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        Assert.NotNull(vm.DetectedClipboardUrl);
+
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_AfterDismiss_SameLinkStaysSuppressed()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        vm.CheckClipboardCommand.Execute(null); // same link still on clipboard
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_AfterDismiss_DifferentLinkReappears()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        vm.DismissDetectedLinkCommand.Execute(null);
+
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/oHg5SJYRHA0");
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Equal("https://youtu.be/oHg5SJYRHA0", vm.DetectedClipboardUrl);
+    }
 }

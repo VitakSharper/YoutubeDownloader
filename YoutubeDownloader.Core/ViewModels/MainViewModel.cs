@@ -213,6 +213,14 @@ public partial class MainViewModel : ObservableObject
         DetectedClipboardUrl = text;
     }
 
+    /// <summary>Dismiss the current suggestion and suppress this same link from reappearing.</summary>
+    [RelayCommand]
+    private void DismissDetectedLink()
+    {
+        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(DetectedClipboardUrl);
+        DetectedClipboardUrl = null;
+    }
+
     [RelayCommand(CanExecute = nameof(CanDownload))]
     private async Task DownloadAsync()
     {
