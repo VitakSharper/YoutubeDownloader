@@ -17,6 +17,7 @@ public class MainViewModelTests
     private readonly Mock<ILinkOpener> _linkOpener = new();
     private readonly Mock<IFileRevealer> _fileRevealer = new();
     private readonly Mock<ISettingsStore> _settings = new();
+    private readonly Mock<IClipboardService> _clipboard = new();
 
     public MainViewModelTests()
     {
@@ -26,7 +27,7 @@ public class MainViewModelTests
 
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object);
+            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",

@@ -21,11 +21,12 @@ public partial class MainViewModel : ObservableObject
     private readonly ILinkOpener _linkOpener;
     private readonly IFileRevealer _fileRevealer;
     private readonly ISettingsStore _settings;
+    private readonly IClipboardService _clipboard;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
-        IFileRevealer fileRevealer, ISettingsStore settings)
+        IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -36,6 +37,7 @@ public partial class MainViewModel : ObservableObject
         _linkOpener = linkOpener;
         _fileRevealer = fileRevealer;
         _settings = settings;
+        _clipboard = clipboard;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
