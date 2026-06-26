@@ -221,6 +221,22 @@ public partial class MainViewModel : ObservableObject
         DetectedClipboardUrl = null;
     }
 
+    /// <summary>Accept the suggested link: fill the box, suppress re-offering it, then fetch its info.</summary>
+    [RelayCommand]
+    private async Task UseDetectedLinkAsync()
+    {
+        var link = DetectedClipboardUrl;
+        if (string.IsNullOrWhiteSpace(link))
+            return;
+
+        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(link);
+        DetectedClipboardUrl = null;
+        Url = link;
+
+        if (FetchInfoCommand.CanExecute(null))
+            await FetchInfoCommand.ExecuteAsync(null);
+    }
+
     [RelayCommand(CanExecute = nameof(CanDownload))]
     private async Task DownloadAsync()
     {

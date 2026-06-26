@@ -517,4 +517,46 @@ public class MainViewModelTests
 
         Assert.Equal("https://youtu.be/oHg5SJYRHA0", vm.DetectedClipboardUrl);
     }
+
+    [Fact]
+    public async Task UseDetectedLink_SetsUrlClearsBannerAndFetches()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", vm.Url);
+        Assert.Null(vm.DetectedClipboardUrl);
+        Assert.Same(info, vm.VideoInfo);
+        _youtube.Verify(s => s.GetVideoInfoAsync("https://youtu.be/dQw4w9WgXcQ", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UseDetectedLink_NoSuggestion_DoesNothing()
+    {
+        var vm = CreateSut(); // DetectedClipboardUrl is null
+
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        Assert.Equal("", vm.Url);
+        _youtube.Verify(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UseDetectedLink_ThenCheckClipboard_DoesNotReappear()
+    {
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(SampleInfo());
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.CheckClipboardCommand.Execute(null);
+        await vm.UseDetectedLinkCommand.ExecuteAsync(null);
+
+        vm.CheckClipboardCommand.Execute(null); // same link still on clipboard
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
 }
