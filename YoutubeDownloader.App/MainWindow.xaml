@@ -220,18 +220,38 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <!-- URL row -->
-                        <Grid Grid.Row="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Margin="0,0,10,0" Style="{StaticResource GlassTextBox}"
-                                     Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
-                            <Button Grid.Column="1" Content="Fetch" Style="{StaticResource AccentButton}"
-                                    Command="{Binding FetchInfoCommand}" />
-                        </Grid>
+                        <!-- URL row, with clipboard-suggestion banner above it -->
+                        <StackPanel Grid.Row="0">
+                            <Border Margin="0,0,0,12" CornerRadius="10" Padding="12,9"
+                                    Background="#33A855F7" BorderBrush="#5CC4B5FD" BorderThickness="1"
+                                    Visibility="{Binding DetectedClipboardUrl, Converter={StaticResource NonEmptyToVis}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="#EDE9FE"
+                                               FontSize="12.5" TextWrapping="Wrap"
+                                               Text="📋 Found a YouTube link on your clipboard." />
+                                    <Button Grid.Column="1" Content="Use it" Style="{StaticResource ChipButton}"
+                                            Command="{Binding UseDetectedLinkCommand}" />
+                                    <Button Grid.Column="2" Content="✕" Style="{StaticResource ChipButton}"
+                                            ToolTip="Dismiss" Command="{Binding DismissDetectedLinkCommand}" />
+                                </Grid>
+                            </Border>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Margin="0,0,10,0" Style="{StaticResource GlassTextBox}"
+                                         Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                                <Button Grid.Column="1" Content="Fetch" Style="{StaticResource AccentButton}"
+                                        Command="{Binding FetchInfoCommand}" />
+                            </Grid>
+                        </StackPanel>
 
                         <!-- Video info -->
                         <Border Grid.Row="1" Margin="0,16,0,0" CornerRadius="12" Padding="14,11"

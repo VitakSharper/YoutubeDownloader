@@ -32,6 +32,7 @@ public partial class App : Application
         services.AddSingleton<ISettingsStore>(_ => new JsonSettingsStore(baseDir));
         services.AddSingleton<ILinkOpener, ProcessLinkOpener>();
         services.AddSingleton<IFileRevealer, ExplorerFileRevealer>();
+        services.AddSingleton<IClipboardService, WpfClipboardService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 
