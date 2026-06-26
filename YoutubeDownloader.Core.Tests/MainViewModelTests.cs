@@ -420,4 +420,61 @@ public class MainViewModelTests
 
         _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.LastSaveFolder == @"C:\out")), Times.Once);
     }
+
+    [Fact]
+    public void CheckClipboard_ValidNewLink_SetsSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_NonYouTubeText_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("just some text");
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_EmptyClipboard_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns((string?)null);
+        var vm = CreateSut();
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_LinkSameVideoAsUrlBox_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        vm.Url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"; // same video, different URL form
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
+
+    [Fact]
+    public void CheckClipboard_WhileBusy_NoSuggestion()
+    {
+        _clipboard.Setup(c => c.GetText()).Returns("https://youtu.be/dQw4w9WgXcQ");
+        var vm = CreateSut();
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsBusy))!.SetValue(vm, true);
+
+        vm.CheckClipboardCommand.Execute(null);
+
+        Assert.Null(vm.DetectedClipboardUrl);
+    }
 }
