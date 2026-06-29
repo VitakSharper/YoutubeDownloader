@@ -13,7 +13,7 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath, FFmpegArguments.ForMuxMp4(videoInput, audioInput, output), duration, progress, ct);
 
-    private static async Task RunAsync(string ffmpegPath, string arguments, TimeSpan duration,
+    internal static async Task RunAsync(string ffmpegPath, string arguments, TimeSpan duration,
         IProgress<double>? progress, CancellationToken ct)
     {
         var psi = new ProcessStartInfo
@@ -43,7 +43,25 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         process.BeginErrorReadLine();
         process.BeginOutputReadLine();
 
-        await process.WaitForExitAsync(ct);
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // WaitForExitAsync only abandons the wait on cancellation; the FFmpeg process keeps
+            // running. Kill the whole tree so cancelling a download never orphans an ffmpeg.exe.
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // The process already exited (or can no longer be killed); nothing more to do.
+            }
+
+            throw;
+        }
 
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"FFmpeg exited with code {process.ExitCode}.");
