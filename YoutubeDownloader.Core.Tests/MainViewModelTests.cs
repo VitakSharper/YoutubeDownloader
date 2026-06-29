@@ -559,4 +559,80 @@ public class MainViewModelTests
 
         Assert.Null(vm.DetectedClipboardUrl);
     }
+
+    [Fact]
+    public void CancelDownload_CannotExecute_WhenNotDownloading()
+    {
+        var vm = CreateSut();
+
+        Assert.False(vm.IsDownloading);
+        Assert.False(vm.CancelDownloadCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Download_Success_LeavesIsDownloadingFalse()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioMp3;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsDownloading);
+    }
+
+    [Fact]
+    public async Task Download_Cancelled_SetsCancelledStatusResetsProgressNoHistoryAndDeletesPartialFile()
+    {
+        // A real file on disk stands in for the partially-written output.
+        var target = Path.Combine(Path.GetTempPath(), $"cancel-test-{Guid.NewGuid():N}.mp3");
+        File.WriteAllText(target, "partial bytes");
+
+        try
+        {
+            var info = SampleInfo();
+            _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+            _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+            _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+            _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(target);
+            // Block the audio download until the token is cancelled, then throw.
+            _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                        It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                    .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) =>
+                        Task.Delay(Timeout.Infinite, ct));
+
+            var vm = CreateSut();
+            vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+            await vm.FetchInfoCommand.ExecuteAsync(null);
+            vm.SelectedMode = DownloadMode.AudioMp3;
+
+            // IsDownloading is set before the first awaited call that actually yields
+            // (EnsureAsync completes synchronously via Moq), so it is already true here.
+            var download = vm.DownloadCommand.ExecuteAsync(null);
+            Assert.True(vm.IsDownloading);
+            Assert.True(vm.CancelDownloadCommand.CanExecute(null));
+
+            vm.CancelDownloadCommand.Execute(null);
+            await download;
+
+            Assert.Equal("Download cancelled.", vm.StatusMessage);
+            Assert.Equal(0, vm.Progress);
+            Assert.Empty(vm.History);
+            Assert.False(vm.IsDownloading);
+            Assert.False(File.Exists(target));
+        }
+        finally
+        {
+            if (File.Exists(target)) File.Delete(target);
+        }
+    }
 }

@@ -94,6 +94,10 @@ public partial class MainViewModel : ObservableObject
     private bool _isBusy;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelDownloadCommand))]
+    private bool _isDownloading;
+
+    [ObservableProperty]
     private string _statusMessage = "Paste a YouTube URL to begin.";
 
     [ObservableProperty]
@@ -237,6 +241,8 @@ public partial class MainViewModel : ObservableObject
             await FetchInfoCommand.ExecuteAsync(null);
     }
 
+    private CancellationTokenSource? _downloadCts;
+
     [RelayCommand(CanExecute = nameof(CanDownload))]
     private async Task DownloadAsync()
     {
@@ -258,11 +264,14 @@ public partial class MainViewModel : ObservableObject
         string formatLabel = "";
         try
         {
+            _downloadCts = new CancellationTokenSource();
+            var token = _downloadCts.Token;
             IsBusy = true;
+            IsDownloading = true;
             Progress = 0;
             StatusMessage = "Preparing FFmpeg…";
             var ffmpegPath = await _ffmpeg.EnsureAsync(
-                new Progress<double>(p => Progress = p * 0.1), CancellationToken.None);
+                new Progress<double>(p => Progress = p * 0.1), token);
 
             if (isAudio)
             {
@@ -270,11 +279,11 @@ public partial class MainViewModel : ObservableObject
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
                 tempFiles.Add(tempAudio);
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
-                    new Progress<double>(p => Progress = 0.1 + p * 0.6), CancellationToken.None);
+                    new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = $"Converting to MP3 ({(int)SelectedBitrate} kbps)…";
                 await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, (int)SelectedBitrate,
-                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), CancellationToken.None);
+                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"MP3 · {(int)SelectedBitrate} kbps";
             }
             else
@@ -288,18 +297,25 @@ public partial class MainViewModel : ObservableObject
                 tempFiles.Add(tempAudio);
 
                 await _youtube.DownloadStreamAsync(quality.Source, tempVideo,
-                    new Progress<double>(p => Progress = 0.1 + p * 0.4), CancellationToken.None);
+                    new Progress<double>(p => Progress = 0.1 + p * 0.4), token);
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
-                    new Progress<double>(p => Progress = 0.5 + p * 0.2), CancellationToken.None);
+                    new Progress<double>(p => Progress = 0.5 + p * 0.2), token);
 
                 StatusMessage = "Merging video + audio…";
                 await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, target,
-                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), CancellationToken.None);
+                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
             }
 
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
             RecordHistory(info.Title, formatLabel, target);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Download cancelled.";
+            Progress = 0;
+            try { if (File.Exists(target)) File.Delete(target); }
+            catch { /* best-effort: partial output may be locked or already gone */ }
         }
         catch (Exception ex)
         {
@@ -308,6 +324,9 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            IsDownloading = false;
+            _downloadCts?.Dispose();
+            _downloadCts = null;
             foreach (var f in tempFiles)
             {
                 try { if (File.Exists(f)) File.Delete(f); }
@@ -315,6 +334,11 @@ public partial class MainViewModel : ObservableObject
             }
         }
     }
+
+    [RelayCommand(CanExecute = nameof(CanCancelDownload))]
+    private void CancelDownload() => _downloadCts?.Cancel();
+
+    private bool CanCancelDownload() => IsDownloading;
 
     private void RememberSaveFolder(string target)
     {
