@@ -608,14 +608,13 @@ public class MainViewModelTests
                     It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                 .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) => gate.Task.WaitAsync(ct));
 
-        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
-
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
         await vm.FetchInfoCommand.ExecuteAsync(null);
         vm.SelectedMode = DownloadMode.AudioMp3;
 
         var download = vm.DownloadCommand.ExecuteAsync(null);
+        // EnsureAsync completes synchronously via Moq, so IsDownloading is already true here.
         Assert.True(vm.IsDownloading);
 
         vm.CancelDownloadCommand.Execute(null);
@@ -623,7 +622,9 @@ public class MainViewModelTests
 
         Assert.Equal("Download cancelled.", vm.StatusMessage);
         Assert.False(vm.IsDownloading);
-        _confirm.Verify(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        _confirm.Verify(c => c.Confirm(
+            "Cancel the current download? Your progress will be lost.",
+            "Cancel download?"), Times.Once);
     }
 
     [Fact]
@@ -655,7 +656,9 @@ public class MainViewModelTests
         vm.CancelDownloadCommand.Execute(null);
         Assert.NotEqual("Download cancelled.", vm.StatusMessage);
         Assert.True(vm.IsDownloading);
-        _confirm.Verify(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        _confirm.Verify(c => c.Confirm(
+            "Cancel the current download? Your progress will be lost.",
+            "Cancel download?"), Times.Once);
 
         // Let the (still-running) download finish normally.
         gate.SetResult();
