@@ -308,8 +308,20 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="#CBD5E1"
                                        FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
-                            <Button Grid.Column="1" Content="Download" Style="{StaticResource AccentButton}"
-                                    Padding="26,10" Command="{Binding DownloadCommand}" />
+                            <Button Grid.Column="1" Padding="26,10">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource AccentButton}">
+                                        <Setter Property="Content" Value="Download" />
+                                        <Setter Property="Command" Value="{Binding DownloadCommand}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                                <Setter Property="Content" Value="Cancel" />
+                                                <Setter Property="Command" Value="{Binding CancelDownloadCommand}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </Grid>
                     </Grid>
                 </TabItem>
