@@ -81,10 +81,11 @@ its `Content` and `Command` while a download runs. **No new converter is
 required.**
 
 ```xml
-<Button Command="{Binding DownloadCommand}">
+<Button Grid.Column="1" Padding="26,10">
   <Button.Style>
-    <Style TargetType="Button" BasedOn="{StaticResource ...existing base style if any}">
+    <Style TargetType="Button" BasedOn="{StaticResource AccentButton}">
       <Setter Property="Content" Value="Download"/>
+      <Setter Property="Command" Value="{Binding DownloadCommand}"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding IsDownloading}" Value="True">
           <Setter Property="Content" Value="Cancel"/>
@@ -96,10 +97,14 @@ required.**
 </Button>
 ```
 
-Implementation note: the current button declares `Command` and `Content` as
-inline attributes. Both move into the `Style` (default `Setter` + trigger
-`Setter`) so the trigger can override them. Any existing styling / `BasedOn` and
-other inline attributes on the button must be preserved.
+Implementation note: the current button declares `Content` and `Command` as
+**inline (local) attributes**. Both MUST move into the `Style` as default
+`Setter`s — not stay as local attributes — because WPF dependency-property
+precedence ranks a local value **above** a `DataTrigger` setter. If `Command`
+stayed local, the trigger's `CancelDownloadCommand` setter would be ignored and
+the "Cancel" button would still fire the download. The non-triggered local
+attributes (`Grid.Column`, `Padding`) and the existing `BasedOn` style
+(`AccentButton`) are preserved.
 
 ## Data Flow
 
