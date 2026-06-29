@@ -33,6 +33,7 @@ public partial class App : Application
         services.AddSingleton<ILinkOpener, ProcessLinkOpener>();
         services.AddSingleton<IFileRevealer, ExplorerFileRevealer>();
         services.AddSingleton<IClipboardService, WpfClipboardService>();
+        services.AddSingleton<IConfirmationService, MessageBoxConfirmationService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 
