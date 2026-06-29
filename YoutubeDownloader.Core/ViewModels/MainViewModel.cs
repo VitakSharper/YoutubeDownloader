@@ -22,11 +22,13 @@ public partial class MainViewModel : ObservableObject
     private readonly IFileRevealer _fileRevealer;
     private readonly ISettingsStore _settings;
     private readonly IClipboardService _clipboard;
+    private readonly IConfirmationService _confirm;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
-        IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard)
+        IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
+        IConfirmationService confirm)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -38,6 +40,7 @@ public partial class MainViewModel : ObservableObject
         _fileRevealer = fileRevealer;
         _settings = settings;
         _clipboard = clipboard;
+        _confirm = confirm;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -336,7 +339,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanCancelDownload))]
-    private void CancelDownload() => _downloadCts?.Cancel();
+    private void CancelDownload()
+    {
+        if (_confirm.Confirm("Cancel the current download? Your progress will be lost.", "Cancel download?"))
+            _downloadCts?.Cancel();
+    }
 
     private bool CanCancelDownload() => IsDownloading;
 

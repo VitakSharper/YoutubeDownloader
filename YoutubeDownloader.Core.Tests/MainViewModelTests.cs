@@ -18,16 +18,19 @@ public class MainViewModelTests
     private readonly Mock<IFileRevealer> _fileRevealer = new();
     private readonly Mock<ISettingsStore> _settings = new();
     private readonly Mock<IClipboardService> _clipboard = new();
+    private readonly Mock<IConfirmationService> _confirm = new();
 
     public MainViewModelTests()
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>());
         _settings.Setup(s => s.Load()).Returns(new AppSettings());
+        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
     }
 
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object);
+            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
+            _confirm.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
         Title: "Test Video",
@@ -586,6 +589,79 @@ public class MainViewModelTests
 
         await vm.DownloadCommand.ExecuteAsync(null);
 
+        Assert.False(vm.IsDownloading);
+    }
+
+    [Fact]
+    public async Task CancelDownload_WhenUserConfirms_CancelsAndAsksForConfirmation()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+
+        // The audio download blocks until the token is cancelled.
+        var gate = new TaskCompletionSource();
+        _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                    It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) => gate.Task.WaitAsync(ct));
+
+        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioMp3;
+
+        var download = vm.DownloadCommand.ExecuteAsync(null);
+        Assert.True(vm.IsDownloading);
+
+        vm.CancelDownloadCommand.Execute(null);
+        await download;
+
+        Assert.Equal("Download cancelled.", vm.StatusMessage);
+        Assert.False(vm.IsDownloading);
+        _confirm.Verify(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CancelDownload_WhenUserDeclines_LetsDownloadContinue()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+
+        var gate = new TaskCompletionSource();
+        _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                    It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) => gate.Task.WaitAsync(ct));
+
+        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioMp3;
+
+        var download = vm.DownloadCommand.ExecuteAsync(null);
+        Assert.True(vm.IsDownloading);
+
+        // User declines the cancel: the download must keep running.
+        vm.CancelDownloadCommand.Execute(null);
+        Assert.NotEqual("Download cancelled.", vm.StatusMessage);
+        Assert.True(vm.IsDownloading);
+        _confirm.Verify(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+
+        // Let the (still-running) download finish normally.
+        gate.SetResult();
+        await download;
+
+        Assert.Equal(@"C:\out\song.mp3", Assert.Single(vm.History).FilePath);
         Assert.False(vm.IsDownloading);
     }
 
