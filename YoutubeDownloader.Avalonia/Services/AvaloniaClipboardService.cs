@@ -1,3 +1,4 @@
+using Avalonia.Input.Platform;
 using YoutubeDownloader.Avalonia.Infrastructure;
 using YoutubeDownloader.Core.Services;
 
@@ -19,7 +20,7 @@ public sealed class AvaloniaClipboardService : IClipboardService
         try
         {
             var clipboard = TopLevelResolver.TopLevel?.Clipboard;
-            _cached = clipboard is null ? null : await clipboard.GetTextAsync();
+            _cached = clipboard is null ? null : await clipboard.TryGetTextAsync();
         }
         catch
         {
