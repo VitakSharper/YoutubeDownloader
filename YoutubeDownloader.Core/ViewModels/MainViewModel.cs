@@ -254,7 +254,7 @@ public partial class MainViewModel : ObservableObject
         var ext = isAudio ? "mp3" : "mp4";
         var suggested = $"{FileNameSanitizer.Sanitize(info.Title)}.{ext}";
 
-        var target = _saveFile.PromptForSavePath(suggested, ext, _appSettings.LastSaveFolder);
+        var target = await _saveFile.PromptForSavePathAsync(suggested, ext, _appSettings.LastSaveFolder);
         if (target is null)
         {
             StatusMessage = "Download cancelled.";
@@ -339,9 +339,9 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanCancelDownload))]
-    private void CancelDownload()
+    private async Task CancelDownloadAsync()
     {
-        if (_confirm.Confirm("Cancel the current download? Your progress will be lost.", "Cancel download?"))
+        if (await _confirm.ConfirmAsync("Cancel the current download? Your progress will be lost.", "Cancel download?"))
             _downloadCts?.Cancel();
     }
 

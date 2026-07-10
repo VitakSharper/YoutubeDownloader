@@ -6,7 +6,7 @@ namespace YoutubeDownloader.App.Services;
 
 public sealed class SaveFileService : ISaveFileService
 {
-    public string? PromptForSavePath(string suggestedFileName, string extension, string? initialDirectory)
+    public Task<string?> PromptForSavePathAsync(string suggestedFileName, string extension, string? initialDirectory)
     {
         var dialog = new SaveFileDialog
         {
@@ -22,6 +22,6 @@ public sealed class SaveFileService : ISaveFileService
         if (!string.IsNullOrEmpty(initialDirectory) && Directory.Exists(initialDirectory))
             dialog.InitialDirectory = initialDirectory;
 
-        return dialog.ShowDialog() == true ? dialog.FileName : null;
+        return Task.FromResult(dialog.ShowDialog() == true ? dialog.FileName : null);
     }
 }

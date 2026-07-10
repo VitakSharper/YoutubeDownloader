@@ -24,7 +24,7 @@ public class MainViewModelTests
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>());
         _settings.Setup(s => s.Load()).Returns(new AppSettings());
-        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        _confirm.Setup(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
     }
 
     private MainViewModel CreateSut() =>
@@ -127,7 +127,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -148,7 +148,7 @@ public class MainViewModelTests
     {
         var info = SampleInfo();
         _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).Returns((string?)null);
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync((string?)null);
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -169,7 +169,7 @@ public class MainViewModelTests
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.SetupSequence(t => t.NewTempFile(It.IsAny<string>()))
              .Returns(@"C:\temp\v.mp4").Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp4", It.IsAny<string?>())).Returns(@"C:\out\clip.mp4");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp4", It.IsAny<string?>())).ReturnsAsync(@"C:\out\clip.mp4");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -192,7 +192,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -217,7 +217,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
         _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
@@ -396,14 +396,14 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", @"C:\Music")).Returns(@"C:\Music\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", @"C:\Music")).ReturnsAsync(@"C:\Music\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
         await vm.FetchInfoCommand.ExecuteAsync(null);
         await vm.DownloadCommand.ExecuteAsync(null);
 
-        _saveFile.Verify(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", @"C:\Music"), Times.Once);
+        _saveFile.Verify(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", @"C:\Music"), Times.Once);
     }
 
     [Fact]
@@ -414,7 +414,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -580,7 +580,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -600,7 +600,7 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         // The audio download blocks until the token is cancelled.
         var gate = new TaskCompletionSource();
@@ -617,12 +617,12 @@ public class MainViewModelTests
         // EnsureAsync completes synchronously via Moq, so IsDownloading is already true here.
         Assert.True(vm.IsDownloading);
 
-        vm.CancelDownloadCommand.Execute(null);
+        await vm.CancelDownloadCommand.ExecuteAsync(null);
         await download;
 
         Assert.Equal("Download cancelled.", vm.StatusMessage);
         Assert.False(vm.IsDownloading);
-        _confirm.Verify(c => c.Confirm(
+        _confirm.Verify(c => c.ConfirmAsync(
             "Cancel the current download? Your progress will be lost.",
             "Cancel download?"), Times.Once);
     }
@@ -635,14 +635,14 @@ public class MainViewModelTests
         _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-        _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(@"C:\out\song.mp3");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
 
         var gate = new TaskCompletionSource();
         _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
                     It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                 .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) => gate.Task.WaitAsync(ct));
 
-        _confirm.Setup(c => c.Confirm(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        _confirm.Setup(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(false);
 
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
@@ -653,10 +653,10 @@ public class MainViewModelTests
         Assert.True(vm.IsDownloading);
 
         // User declines the cancel: the download must keep running.
-        vm.CancelDownloadCommand.Execute(null);
+        await vm.CancelDownloadCommand.ExecuteAsync(null);
         Assert.NotEqual("Download cancelled.", vm.StatusMessage);
         Assert.True(vm.IsDownloading);
-        _confirm.Verify(c => c.Confirm(
+        _confirm.Verify(c => c.ConfirmAsync(
             "Cancel the current download? Your progress will be lost.",
             "Cancel download?"), Times.Once);
 
@@ -682,7 +682,7 @@ public class MainViewModelTests
             _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
                    .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
             _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
-            _saveFile.Setup(s => s.PromptForSavePath(It.IsAny<string>(), "mp3", It.IsAny<string?>())).Returns(target);
+            _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(target);
             // Block the audio download until the token is cancelled, then throw.
             _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
                         It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
