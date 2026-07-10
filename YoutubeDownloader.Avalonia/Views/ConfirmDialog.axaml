@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="YoutubeDownloader.Avalonia.Views.ConfirmDialog"
+        Width="380" SizeToContent="Height"
+        CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1A1726">
+  <StackPanel Margin="22" Spacing="18">
+    <TextBlock x:Name="TitleText" FontSize="15" FontWeight="SemiBold" Foreground="#F5F3FF" />
+    <TextBlock x:Name="MessageText" FontSize="13" Foreground="#B8B0D0" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button x:Name="NoButton" Content="No" Padding="18,7" />
+      <Button x:Name="YesButton" Content="Yes" Padding="18,7"
+              Background="#A855F7" Foreground="White" />
+    </StackPanel>
+  </StackPanel>
+</Window>
