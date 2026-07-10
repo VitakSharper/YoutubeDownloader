@@ -131,9 +131,77 @@
         </Grid>
       </TabItem>
 
-      <!-- ===== HISTORY (placeholder — built in Task 7) ===== -->
+      <!-- ===== HISTORY ===== -->
       <TabItem Header="History">
-        <TextBlock Margin="20" Text="History tab — built in Task 7" />
+        <Grid Margin="0,16,0,0" RowDefinitions="Auto,*">
+
+          <!-- Search + clear -->
+          <Grid Grid.Row="0" Margin="0,0,0,12" ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Classes="glass" Margin="0,0,10,0"
+                     Watermark="Search by title or link…" Text="{Binding SearchText}" />
+            <Button Grid.Column="1" Classes="chip" Content="Clear all" VerticalAlignment="Center"
+                    Command="{Binding ClearHistoryCommand}" />
+          </Grid>
+
+          <!-- Empty / no-results state -->
+          <TextBlock Grid.Row="1" Text="{Binding HistoryPlaceholder}"
+                     Foreground="{StaticResource TextMutedBrush}" FontSize="13" TextWrapping="Wrap"
+                     MaxWidth="360" TextAlignment="Center"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     IsVisible="{Binding HistoryPlaceholder, Converter={StaticResource NotNull}}" />
+
+          <!-- Grouped list -->
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding HistoryGroups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:HistoryGroup">
+                  <StackPanel Margin="0,0,0,4">
+                    <TextBlock Text="{Binding Header}" Foreground="{StaticResource LabelBrush}"
+                               FontWeight="SemiBold" FontSize="11.5" Margin="2,6,0,7" />
+                    <ItemsControl ItemsSource="{Binding Entries}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:HistoryEntry">
+                          <Border Classes="card" Margin="0,0,0,9">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <StackPanel Grid.Column="0" Margin="0,0,10,0" Spacing="5">
+                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <Border CornerRadius="5" Background="#3DA855F7" Padding="7,2" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Format}" Foreground="#EDE9FE" FontSize="10.5" />
+                                  </Border>
+                                  <TextBlock Text="{Binding TimeDisplay}" Foreground="{StaticResource TextMutedBrush}"
+                                             FontSize="10.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Url}" Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="10.5" TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                                <Button Classes="chip" Content="Use"
+                                        Command="{Binding #Root.((vm:MainViewModel)DataContext).UseEntryCommand}"
+                                        CommandParameter="{Binding}" />
+                                <Button Classes="chip" Content="Open"
+                                        Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenInBrowserCommand}"
+                                        CommandParameter="{Binding}" />
+                                <Button Classes="chip" Content="Folder"
+                                        IsVisible="{Binding FilePath, Converter={StaticResource NotEmpty}}"
+                                        Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenFolderCommand}"
+                                        CommandParameter="{Binding}" />
+                                <Button Classes="chip" Content="✕"
+                                        Command="{Binding #Root.((vm:MainViewModel)DataContext).RemoveEntryCommand}"
+                                        CommandParameter="{Binding}" />
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
       </TabItem>
     </TabControl>
   </Grid>
