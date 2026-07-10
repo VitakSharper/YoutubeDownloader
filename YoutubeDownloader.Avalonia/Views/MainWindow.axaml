@@ -29,7 +29,7 @@
       <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="6">
         <CheckBox Content="Always on top" IsChecked="{Binding AlwaysOnTop}"
                   HorizontalAlignment="Right" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
-        <StackPanel DataContext="{Binding #Root.Update}" x:DataType="vm:UpdateViewModel"
+        <StackPanel x:Name="UpdatePanel" x:DataType="vm:UpdateViewModel"
                     HorizontalAlignment="Right" Spacing="4">
           <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
             <Button Classes="chip" Content="Check for updates"
