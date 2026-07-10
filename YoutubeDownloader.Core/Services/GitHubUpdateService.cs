@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Text.Json;
 using YoutubeDownloader.Core.Helpers;
@@ -63,6 +64,55 @@ public sealed class GitHubUpdateService : IUpdateService
         return new UpdateInfo(_options.CurrentVersion, latest, available, downloadUrl, assetName, releaseUrl, notes);
     }
 
-    public Task<string> DownloadAndExtractAsync(UpdateInfo info, IProgress<double>? progress, CancellationToken ct = default)
-        => throw new NotImplementedException(); // Task 3
+    public async Task<string> DownloadAndExtractAsync(UpdateInfo info, IProgress<double>? progress, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(info.DownloadUrl) || string.IsNullOrEmpty(info.AssetName))
+            throw new InvalidOperationException("The latest release has no downloadable file.");
+
+        var versionText = info.LatestVersion?.ToString() ?? "latest";
+        var root = _options.DownloadRoot;
+        if (string.IsNullOrEmpty(root))
+        {
+            root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            if (!Directory.Exists(root))
+                root = Path.GetTempPath();
+        }
+
+        var targetDir = Path.Combine(root, $"Liudochka-{versionText}");
+        Directory.CreateDirectory(targetDir);
+
+        var zipPath = Path.Combine(targetDir, info.AssetName);
+        await DownloadFileAsync(info.DownloadUrl, zipPath, progress, ct);
+
+        ZipFile.ExtractToDirectory(zipPath, targetDir, overwriteFiles: true);
+
+        var exe = Directory.EnumerateFiles(targetDir, "*.exe", SearchOption.AllDirectories).FirstOrDefault();
+        return exe ?? targetDir;
+    }
+
+    private async Task DownloadFileAsync(string url, string destPath, IProgress<double>? progress, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.UserAgent.ParseAdd(UserAgent);
+
+        using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        res.EnsureSuccessStatusCode();
+
+        var total = res.Content.Headers.ContentLength ?? -1L;
+        await using var src = await res.Content.ReadAsStreamAsync(ct);
+        await using var dst = File.Create(destPath);
+
+        var buffer = new byte[81920];
+        long readTotal = 0;
+        int read;
+        while ((read = await src.ReadAsync(buffer, ct)) > 0)
+        {
+            await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+            readTotal += read;
+            if (total > 0)
+                progress?.Report((double)readTotal / total);
+        }
+
+        progress?.Report(1.0);
+    }
 }
