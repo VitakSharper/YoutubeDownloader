@@ -1,8 +1,120 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:YoutubeDownloader.Avalonia.Converters"
              x:Class="YoutubeDownloader.Avalonia.App"
              RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <conv:NullToBoolConverter x:Key="NotNull" />
+    <conv:StringNotEmptyToBoolConverter x:Key="NotEmpty" />
+    <conv:DownloadModeDisplayConverter x:Key="ModeDisplay" />
+    <conv:Mp3BitrateDisplayConverter x:Key="BitrateDisplay" />
+
+    <SolidColorBrush x:Key="AccentBrush" Color="#A855F7" />
+    <SolidColorBrush x:Key="CardBrush" Color="#1A1726" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#2A2438" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F5F3FF" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B8B0D0" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#8B82A8" />
+    <SolidColorBrush x:Key="LabelBrush" Color="#C4B5FD" />
+
+    <LinearGradientBrush x:Key="AccentGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+      <GradientStop Color="#8B5CF6" Offset="0" />
+      <GradientStop Color="#EC4899" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="WindowBackground" StartPoint="0%,0%" EndPoint="100%,100%">
+      <GradientStop Color="#141020" Offset="0" />
+      <GradientStop Color="#0C0A12" Offset="1" />
+    </LinearGradientBrush>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
+
+    <!-- Section label -->
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource LabelBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Margin" Value="2,0,0,5" />
+    </Style>
+
+    <!-- Card surface -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{StaticResource CardBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14,12" />
+    </Style>
+
+    <!-- Accent (primary) button -->
+    <Style Selector="Button.accent">
+      <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Padding" Value="18,9" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+      <Setter Property="Opacity" Value="0.9" />
+    </Style>
+
+    <!-- Chip (ghost) button -->
+    <Style Selector="Button.chip">
+      <Setter Property="Background" Value="#221D30" />
+      <Setter Property="BorderBrush" Value="#33FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Padding" Value="11,5" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- Rounded text box -->
+    <Style Selector="TextBox.glass">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Background" Value="#221D30" />
+      <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+    </Style>
+
+    <!-- Pill tab headers -->
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="Padding" Value="18,7" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border x:Name="PART_Pill" Background="#1FFFFFFF" CornerRadius="9" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding Header}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="TabItem:selected /template/ Border#PART_Pill">
+      <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+    </Style>
+
+    <!-- Accent progress bar -->
+    <Style Selector="ProgressBar.accent">
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Background" Value="#22FFFFFF" />
+      <Setter Property="MinHeight" Value="8" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
   </Application.Styles>
 </Application>

@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:YoutubeDownloader.Core.ViewModels;assembly=YoutubeDownloader.Core"
+        xmlns:models="clr-namespace:YoutubeDownloader.Core.Models;assembly=YoutubeDownloader.Core"
+        xmlns:imaging="clr-namespace:YoutubeDownloader.Avalonia.Imaging"
         x:Class="YoutubeDownloader.Avalonia.Views.MainWindow"
         x:Name="Root"
         x:DataType="vm:MainViewModel"
@@ -8,13 +10,131 @@
         Width="720" Height="640" MinWidth="580" MinHeight="560"
         WindowStartupLocation="CenterScreen"
         Topmost="{Binding AlwaysOnTop}"
+        Background="{StaticResource WindowBackground}"
         Icon="/Assets/app.ico">
-  <TabControl SelectedIndex="{Binding SelectedTabIndex}">
-    <TabItem Header="Download">
-      <TextBlock Margin="20" Text="Download tab — built in Task 6" />
-    </TabItem>
-    <TabItem Header="History">
-      <TextBlock Margin="20" Text="History tab — built in Task 7" />
-    </TabItem>
-  </TabControl>
+
+  <Grid Margin="18" RowDefinitions="Auto,*">
+
+    <!-- Header -->
+    <Grid Grid.Row="0" Margin="4,2,4,16" ColumnDefinitions="Auto,*,Auto">
+      <Image Grid.Column="0" Source="/Assets/app.ico" Width="44" Height="44" />
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0" Spacing="2">
+        <TextBlock FontSize="21">
+          <Run Text="Liudochka" FontWeight="Bold" Foreground="#F0ABFC" />
+          <Run Text=" Youtube Downloader" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        </TextBlock>
+        <TextBlock Text="Grab audio &amp; video from any YouTube link"
+                   FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+      </StackPanel>
+      <CheckBox Grid.Column="2" Content="Always on top" IsChecked="{Binding AlwaysOnTop}"
+                VerticalAlignment="Center" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+    </Grid>
+
+    <!-- Tabs -->
+    <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}" Padding="0">
+
+      <!-- ===== DOWNLOAD ===== -->
+      <TabItem Header="Download">
+        <Grid Margin="0,16,0,0" RowDefinitions="Auto,Auto,*,Auto,Auto">
+
+          <!-- URL row + clipboard banner -->
+          <StackPanel Grid.Row="0" Spacing="12">
+            <Border Classes="card" Background="#2A1E3E" BorderBrush="#4C3A6E"
+                    IsVisible="{Binding DetectedClipboardUrl, Converter={StaticResource NotEmpty}}">
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12.5" TextWrapping="Wrap"
+                           Foreground="#EDE9FE" Text="📋 Found a YouTube link on your clipboard." />
+                <Button Grid.Column="1" Classes="chip" Content="Use it"
+                        Command="{Binding UseDetectedLinkCommand}" Margin="8,0,0,0" />
+                <Button Grid.Column="2" Classes="chip" Content="✕"
+                        Command="{Binding DismissDetectedLinkCommand}" Margin="6,0,0,0" />
+              </Grid>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Grid.Column="0" Classes="glass" Margin="0,0,10,0"
+                       Watermark="Paste a YouTube URL…"
+                       Text="{Binding Url}" IsEnabled="{Binding !IsBusy}" />
+              <Button Grid.Column="1" Classes="accent" Content="Fetch"
+                      Command="{Binding FetchInfoCommand}" />
+            </Grid>
+          </StackPanel>
+
+          <!-- Video info card (title + author + thumbnail) -->
+          <Border Grid.Row="1" Classes="card" Margin="0,16,0,0"
+                  IsVisible="{Binding VideoInfo, Converter={StaticResource NotNull}}">
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Grid.Column="0" Width="120" Height="68" CornerRadius="8" ClipToBounds="True"
+                      Background="#221D30" Margin="0,0,14,0">
+                <Image imaging:AsyncImage.SourceUrl="{Binding VideoInfo.ThumbnailUrl}" Stretch="UniformToFill" />
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                <TextBlock Text="{Binding VideoInfo.Title}" Foreground="{StaticResource TextPrimaryBrush}"
+                           FontSize="15" FontWeight="Bold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding VideoInfo.Author}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Options -->
+          <StackPanel Grid.Row="2" Margin="0,18,0,0" Spacing="0"
+                      IsVisible="{Binding VideoInfo, Converter={StaticResource NotNull}}">
+            <TextBlock Classes="label" Text="FORMAT" />
+            <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,0,0,14"
+                      ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:DownloadMode">
+                  <TextBlock Text="{Binding Converter={StaticResource ModeDisplay}}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <TextBlock Classes="label" Text="MP3 BITRATE" />
+            <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,0,0,6"
+                      ItemsSource="{Binding Bitrates}" SelectedItem="{Binding SelectedBitrate}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:Mp3Bitrate">
+                  <TextBlock Text="{Binding Converter={StaticResource BitrateDisplay}}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Border CornerRadius="8" Background="#3A2A0C" Padding="10,7" Margin="0,2,0,14"
+                    IsVisible="{Binding UpscaleWarning, Converter={StaticResource NotNull}}">
+              <TextBlock Text="{Binding UpscaleWarning}" Foreground="#FCD34D" FontSize="12" TextWrapping="Wrap" />
+            </Border>
+
+            <TextBlock Classes="label" Text="VIDEO QUALITY" />
+            <ComboBox Width="260" HorizontalAlignment="Left"
+                      ItemsSource="{Binding VideoInfo.VideoOptions}" SelectedItem="{Binding SelectedVideoQuality}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="models:VideoStreamOption">
+                  <TextBlock Text="{Binding QualityLabel}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+
+          <!-- Progress -->
+          <ProgressBar Grid.Row="3" Classes="accent" Margin="0,18,0,10"
+                       Minimum="0" Maximum="1" Value="{Binding Progress}" />
+
+          <!-- Status + action -->
+          <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+            <Button Grid.Column="1" Classes="accent" Content="Download" Padding="26,10"
+                    Command="{Binding DownloadCommand}" IsVisible="{Binding !IsDownloading}" />
+            <Button Grid.Column="1" Classes="accent" Content="Cancel" Padding="26,10"
+                    Command="{Binding CancelDownloadCommand}" IsVisible="{Binding IsDownloading}" />
+          </Grid>
+        </Grid>
+      </TabItem>
+
+      <!-- ===== HISTORY (placeholder — built in Task 7) ===== -->
+      <TabItem Header="History">
+        <TextBlock Margin="20" Text="History tab — built in Task 7" />
+      </TabItem>
+    </TabControl>
+  </Grid>
 </Window>
