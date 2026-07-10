@@ -61,7 +61,11 @@
     </Style>
     <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource AccentGradient}" />
-      <Setter Property="Opacity" Value="0.9" />
+      <Setter Property="Opacity" Value="0.92" />
+    </Style>
+    <Style Selector="Button.accent:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+      <Setter Property="Opacity" Value="0.8" />
     </Style>
 
     <!-- Chip (ghost) button -->
@@ -74,6 +78,14 @@
       <Setter Property="Padding" Value="11,5" />
       <Setter Property="CornerRadius" Value="7" />
       <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.chip:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#2C2540" />
+      <Setter Property="BorderBrush" Value="#4DFFFFFF" />
+    </Style>
+    <Style Selector="Button.chip:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="#221D30" />
+      <Setter Property="Opacity" Value="0.75" />
     </Style>
 
     <!-- Rounded text box -->
@@ -107,6 +119,12 @@
     </Style>
     <Style Selector="TabItem:selected /template/ Border#PART_Pill">
       <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+    </Style>
+    <Style Selector="TabItem:not(:selected):pointerover">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TabItem:not(:selected):pointerover /template/ Border#PART_Pill">
+      <Setter Property="Background" Value="#2EFFFFFF" />
     </Style>
 
     <!-- Accent progress bar -->

@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 
 namespace YoutubeDownloader.Avalonia.Views;
@@ -19,6 +18,4 @@ public partial class ConfirmDialog : Window
         TitleText.Text = title;
         MessageText.Text = message;
     }
-
-    private void InitializeComponent() { } // referenced controls are wired via x:Name after Load
 }
