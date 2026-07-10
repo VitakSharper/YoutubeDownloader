@@ -94,3 +94,16 @@ The UI is kept thin: all logic lives in `Core` behind interfaces and is wired up
 ## Disclaimer
 
 This is a personal hobby project and is **not affiliated with YouTube or Google**. Please download only content you have the right to, and respect YouTube's Terms of Service and applicable copyright law.
+
+## Releasing / in-app updates
+
+The Avalonia app has a manual **Check for updates** button (header) that queries GitHub
+Releases. To cut a release:
+
+1. Bump `<Version>` in `YoutubeDownloader.Avalonia.csproj` and in `release.cmd`.
+2. Run `release.cmd` — it publishes the single-file exe and zips it to `dist\`.
+3. Publish the release (this is public):
+   `gh release create v<version> "dist\LiudochkaYoutubeDownloader.Avalonia-v<version>.zip" --title "v<version>" --notes "..."`
+
+Users on an older build click **Check for updates** → **Download**; the app fetches the
+zip, extracts the new exe to their Downloads folder, and opens it in Explorer to swap in.
