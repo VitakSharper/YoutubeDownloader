@@ -14,6 +14,8 @@ public static class ReleaseVersion
         if (trimmed[0] is 'v' or 'V')
             trimmed = trimmed[1..];
 
-        return Version.TryParse(trimmed, out version!);
+        var parsed = Version.TryParse(trimmed, out var candidate);
+        version = candidate ?? new Version(0, 0);
+        return parsed;
     }
 }

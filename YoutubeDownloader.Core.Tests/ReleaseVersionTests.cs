@@ -19,6 +19,8 @@ public class ReleaseVersionTests
         Assert.Equal(ok, result);
         if (ok)
             Assert.Equal(Version.Parse(expected!), version);
+        else
+            Assert.Equal(new Version(0, 0), version);
     }
 
     [Fact]
