@@ -46,6 +46,8 @@ public class GitHubUpdateServiceDownloadTests
             Assert.EndsWith(".exe", exePath);
             Assert.Equal(payload, await File.ReadAllBytesAsync(exePath));
             Assert.Contains(tempRoot, exePath);
+            Assert.NotEmpty(progressValues);
+            Assert.Equal(1.0, progressValues[^1]);
         }
         finally
         {

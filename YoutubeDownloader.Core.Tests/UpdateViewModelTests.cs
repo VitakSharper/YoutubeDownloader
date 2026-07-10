@@ -93,4 +93,17 @@ public class UpdateViewModelTests
         svc.Verify(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
         rev.Verify(r => r.RevealInFolder(It.IsAny<string>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Check_available_without_download_url_reports_no_file()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new UpdateInfo(new Version(1, 0, 0), new Version(1, 1, 0), true, null, null, null, null));
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsUpdateAvailable);
+        Assert.Contains("no downloadable file", vm.Status, StringComparison.OrdinalIgnoreCase);
+    }
 }

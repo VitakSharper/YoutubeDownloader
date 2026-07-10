@@ -71,4 +71,24 @@ public class GitHubUpdateServiceCheckTests
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => Service(client).CheckAsync());
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
     }
+
+    [Fact]
+    public async Task Network_failure_propagates_as_HttpRequestException()
+    {
+        var client = new HttpClient(new ThrowingHttpMessageHandler(new HttpRequestException("no network")));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Service(client).CheckAsync());
+    }
+
+    [Fact]
+    public async Task Newer_release_without_zip_asset_has_no_download_url()
+    {
+        const string json = """
+        { "tag_name": "v2.0.0", "html_url": "https://x/rel", "body": "n", "assets": [] }
+        """;
+        var client = StubHttpMessageHandler.Client(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, json));
+        var info = await Service(client, "1.0.0").CheckAsync();
+        Assert.True(info.IsUpdateAvailable);
+        Assert.Null(info.DownloadUrl);
+        Assert.Null(info.AssetName);
+    }
 }
