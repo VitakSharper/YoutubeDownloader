@@ -26,8 +26,24 @@
         <TextBlock Text="Grab audio &amp; video from any YouTube link"
                    FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
       </StackPanel>
-      <CheckBox Grid.Column="2" Content="Always on top" IsChecked="{Binding AlwaysOnTop}"
-                VerticalAlignment="Center" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+      <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="6">
+        <CheckBox Content="Always on top" IsChecked="{Binding AlwaysOnTop}"
+                  HorizontalAlignment="Right" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" />
+        <StackPanel DataContext="{Binding #Root.Update}" x:DataType="vm:UpdateViewModel"
+                    HorizontalAlignment="Right" Spacing="4">
+          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Button Classes="chip" Content="Check for updates"
+                    Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding !IsBusy}" />
+            <Button Classes="chip" Content="Download"
+                    Command="{Binding DownloadUpdateCommand}"
+                    IsVisible="{Binding IsUpdateAvailable}" IsEnabled="{Binding !IsBusy}" />
+          </StackPanel>
+          <TextBlock Text="{Binding Status}" FontSize="10.5" TextWrapping="Wrap"
+                     MaxWidth="240" HorizontalAlignment="Right" TextAlignment="Right"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     IsVisible="{Binding Status, Converter={StaticResource NotEmpty}}" />
+        </StackPanel>
+      </StackPanel>
     </Grid>
 
     <!-- Tabs -->

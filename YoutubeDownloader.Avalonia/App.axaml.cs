@@ -1,11 +1,13 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using YoutubeDownloader.Avalonia.Services;
 using YoutubeDownloader.Avalonia.Views;
+using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
 using YoutubeDownloader.Core.ViewModels;
 
@@ -39,6 +41,11 @@ public partial class App : Application
         services.AddSingleton<AvaloniaClipboardService>();
         services.AddSingleton<IClipboardService>(sp => sp.GetRequiredService<AvaloniaClipboardService>());
         services.AddSingleton<IConfirmationService, AvaloniaConfirmationService>();
+        var currentVersion = typeof(App).Assembly.GetName().Version ?? new Version(1, 0, 0);
+        var updateHttp = new HttpClient();
+        services.AddSingleton<IUpdateService>(_ =>
+            new GitHubUpdateService(updateHttp, new UpdateOptions("VitakSharper", "YoutubeDownloader", currentVersion)));
+        services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

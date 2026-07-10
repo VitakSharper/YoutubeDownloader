@@ -15,12 +15,14 @@ public partial class MainWindow : Window
         AvaloniaXamlLoader.Load(this);
         _vm = null!;
         _clipboard = null!;
+        Update = null!;
     }
 
-    public MainWindow(MainViewModel vm, AvaloniaClipboardService clipboard) : this()
+    public MainWindow(MainViewModel vm, AvaloniaClipboardService clipboard, UpdateViewModel update) : this()
     {
         _vm = vm;
         _clipboard = clipboard;
+        Update = update;
         DataContext = vm;
 
         // Fires on first show (covers startup) and on every refocus.
@@ -31,4 +33,7 @@ public partial class MainWindow : Window
             _vm.CheckClipboardCommand.Execute(null);
         };
     }
+
+    /// <summary>Update-check VM, surfaced for the header controls (bound via #Root.Update).</summary>
+    public UpdateViewModel Update { get; }
 }

@@ -10,6 +10,7 @@
     <AssemblyName>LiudochkaYoutubeDownloader.Avalonia</AssemblyName>
     <AssemblyTitle>Liudochka Youtube Downloader</AssemblyTitle>
     <Product>Liudochka Youtube Downloader</Product>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
