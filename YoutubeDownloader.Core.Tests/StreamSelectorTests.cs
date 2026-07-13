@@ -8,6 +8,9 @@ public class StreamSelectorTests
     private static AudioStreamOption Audio(int kbps, string container = "mp4")
         => new("aac", kbps, container, Source: null!);
 
+    private static AudioStreamOption Opus(int kbps)
+        => new("opus", kbps, "webm", Source: null!);
+
     private static VideoStreamOption Video(string label, int height, string container)
         => new(label, height, container, Source: null!);
 
@@ -40,5 +43,21 @@ public class StreamSelectorTests
         var result = StreamSelector.OrderVideoOptions(input);
 
         Assert.Equal(new[] { "1080p", "720p", "360p" }, result.Select(v => v.QualityLabel).ToArray());
+    }
+
+    [Fact]
+    public void PickBestOpusAudio_ReturnsHighestBitrateOpus_IgnoringOtherCodecs()
+    {
+        var best = StreamSelector.PickBestOpusAudio(new[] { Audio(320), Opus(96), Opus(160), Audio(256) });
+        Assert.NotNull(best);
+        Assert.Equal(160, best!.BitrateKbps);
+        Assert.Equal("opus", best.Codec);
+    }
+
+    [Fact]
+    public void PickBestOpusAudio_ReturnsNull_WhenNoOpusStream()
+    {
+        var best = StreamSelector.PickBestOpusAudio(new[] { Audio(128), Audio(256) });
+        Assert.Null(best);
     }
 }

@@ -17,4 +17,10 @@ public static class StreamSelector
             .Select(g => g.First())
             .OrderByDescending(v => v.Height)
             .ToList();
+
+    public static AudioStreamOption? PickBestOpusAudio(IEnumerable<AudioStreamOption> audio)
+        => audio
+            .Where(a => a.Codec.Contains("opus", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(a => a.BitrateKbps)
+            .FirstOrDefault();
 }
