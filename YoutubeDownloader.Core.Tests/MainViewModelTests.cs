@@ -288,15 +288,39 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void ClearHistory_EmptiesAndSaves()
+    public async Task ClearHistory_WhenConfirmed_EmptiesAndSaves()
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry> { new() { Url = "u1" } });
+        _confirm.Setup(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
         var vm = CreateSut();
 
-        vm.ClearHistoryCommand.Execute(null);
+        await vm.ClearHistoryCommand.ExecuteAsync(null);
 
         Assert.Empty(vm.History);
         _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ClearHistory_WhenDeclined_KeepsHistory()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry> { new() { Url = "u1" } });
+        _confirm.Setup(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(false);
+        var vm = CreateSut();
+
+        await vm.ClearHistoryCommand.ExecuteAsync(null);
+
+        Assert.Single(vm.History);
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ClearHistory_WhenEmpty_DoesNotPrompt()
+    {
+        var vm = CreateSut();
+
+        await vm.ClearHistoryCommand.ExecuteAsync(null);
+
+        _confirm.Verify(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

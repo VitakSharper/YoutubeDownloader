@@ -451,9 +451,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClearHistory()
+    private async Task ClearHistoryAsync()
     {
         if (History.Count == 0)
+            return;
+        if (!await _confirm.ConfirmAsync("Clear all download history? This can't be undone.", "Clear history?"))
             return;
         History.Clear();
         _history.Save(History);
