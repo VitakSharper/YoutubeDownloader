@@ -32,13 +32,14 @@ public class MainViewModelTests
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
             _confirm.Object);
 
-    private static VideoInfo SampleInfo(int sourceAudioKbps = 128) => new(
+    private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true) => new(
         Title: "Test Video",
         Author: "Tester",
         Duration: TimeSpan.FromMinutes(3),
         ThumbnailUrl: "",
         BestAudio: new AudioStreamOption("opus", sourceAudioKbps, "webm", Source: null!),
-        VideoOptions: new[] { new VideoStreamOption("720p", 720, "mp4", Source: null!) });
+        VideoOptions: new[] { new VideoStreamOption("720p", 720, "mp4", Source: null!) },
+        BestOpusAudio: withOpus ? new AudioStreamOption("opus", 160, "webm", Source: null!) : null);
 
     [Fact]
     public async Task FetchInfo_WithInvalidUrl_SetsErrorAndDoesNotCallService()
@@ -590,6 +591,61 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsDownloading);
+    }
+
+    [Fact]
+    public void ShowBitrate_HiddenOnlyForOpusMode()
+    {
+        var vm = CreateSut();
+
+        vm.SelectedMode = DownloadMode.AudioMp3;
+        Assert.True(vm.ShowBitrate);
+        vm.SelectedMode = DownloadMode.Video;
+        Assert.True(vm.ShowBitrate);
+        vm.SelectedMode = DownloadMode.AudioOpus;
+        Assert.False(vm.ShowBitrate);
+    }
+
+    [Fact]
+    public async Task Download_OpusMode_RemuxesNativeStreamAndRecordsOpusFormat()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "opus", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.opus");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioOpus;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.opus",
+            info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal("Opus · 160 kbps", Assert.Single(vm.History).Format);
+    }
+
+    [Fact]
+    public async Task Download_OpusMode_NoOpusStream_ErrorsWithoutPrompting()
+    {
+        var info = SampleInfo(withOpus: false);
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioOpus;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Contains("Opus", vm.StatusMessage);
+        _saveFile.Verify(s => s.PromptForSavePathAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()), Times.Never);
+        Assert.Empty(vm.History);
     }
 
     [Fact]

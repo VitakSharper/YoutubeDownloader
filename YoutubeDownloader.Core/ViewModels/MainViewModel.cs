@@ -113,6 +113,7 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpscaleWarning))]
+    [NotifyPropertyChangedFor(nameof(ShowBitrate))]
     private DownloadMode _selectedMode = DownloadMode.AudioMp3;
 
     [ObservableProperty]
@@ -151,6 +152,9 @@ public partial class MainViewModel : ObservableObject
 
     public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
+
+    /// <summary>Bitrate only applies to MP3; hidden for the copy-only Opus mode.</summary>
+    public bool ShowBitrate => SelectedMode != DownloadMode.AudioOpus;
 
     public string? UpscaleWarning =>
         VideoInfo is not null
@@ -250,8 +254,19 @@ public partial class MainViewModel : ObservableObject
     private async Task DownloadAsync()
     {
         var info = VideoInfo!;
-        var isAudio = SelectedMode == DownloadMode.AudioMp3;
-        var ext = isAudio ? "mp3" : "mp4";
+
+        if (SelectedMode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
+        {
+            StatusMessage = "This video has no Opus audio stream to save.";
+            return;
+        }
+
+        var ext = SelectedMode switch
+        {
+            DownloadMode.AudioMp3 => "mp3",
+            DownloadMode.AudioOpus => "opus",
+            _ => "mp4"
+        };
         var suggested = $"{FileNameSanitizer.Sanitize(info.Title)}.{ext}";
 
         var target = await _saveFile.PromptForSavePathAsync(suggested, ext, _appSettings.LastSaveFolder);
@@ -276,7 +291,7 @@ public partial class MainViewModel : ObservableObject
             var ffmpegPath = await _ffmpeg.EnsureAsync(
                 new Progress<double>(p => Progress = p * 0.1), token);
 
-            if (isAudio)
+            if (SelectedMode == DownloadMode.AudioMp3)
             {
                 StatusMessage = "Downloading audio…";
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
@@ -288,6 +303,19 @@ public partial class MainViewModel : ObservableObject
                 await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, (int)SelectedBitrate,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"MP3 · {(int)SelectedBitrate} kbps";
+            }
+            else if (SelectedMode == DownloadMode.AudioOpus)
+            {
+                StatusMessage = "Downloading audio…";
+                var tempAudio = _temp.NewTempFile(info.BestOpusAudio!.Container);
+                tempFiles.Add(tempAudio);
+                await _youtube.DownloadStreamAsync(info.BestOpusAudio.Source, tempAudio,
+                    new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
+
+                StatusMessage = "Saving Opus audio…";
+                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, target,
+                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
+                formatLabel = $"Opus · {info.BestOpusAudio.BitrateKbps} kbps";
             }
             else
             {
