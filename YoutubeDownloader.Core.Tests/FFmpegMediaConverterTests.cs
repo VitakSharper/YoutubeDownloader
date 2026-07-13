@@ -15,6 +15,16 @@ public class FFmpegMediaConverterTests
     }
 
     [Fact]
+    public async Task RemuxToOpusAsync_WhenFfmpegPathInvalid_Throws()
+    {
+        var converter = new FFmpegMediaConverter();
+        var missing = Path.Combine(Path.GetTempPath(), "definitely-not-ffmpeg-" + Guid.NewGuid().ToString("N") + ".exe");
+
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            converter.RemuxToOpusAsync(missing, "in.webm", "out.opus", TimeSpan.FromSeconds(10), null, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task RunAsync_WhenCancelled_KillsTheSpawnedProcess()
     {
         // The spawned process keeps "working" by rewriting a heartbeat file ~every 100ms, bumping its

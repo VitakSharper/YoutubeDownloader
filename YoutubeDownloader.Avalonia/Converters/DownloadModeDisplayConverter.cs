@@ -11,6 +11,7 @@ public sealed class DownloadModeDisplayConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
     {
         DownloadMode.AudioMp3 => "MP3 audio",
+        DownloadMode.AudioOpus => "Opus audio",
         DownloadMode.Video => "Video (MP4)",
         _ => value?.ToString() ?? ""
     };

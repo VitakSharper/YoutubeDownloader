@@ -22,6 +22,7 @@ public sealed class YoutubeExplodeService : IYouTubeService
             throw new InvalidOperationException("This video has no downloadable audio stream.");
 
         var bestAudio = StreamSelector.PickBestAudio(audioOptions);
+        var bestOpus = StreamSelector.PickBestOpusAudio(audioOptions);
 
         var videoOptions = StreamSelector.OrderVideoOptions(
             manifest.GetVideoOnlyStreams()
@@ -35,7 +36,8 @@ public sealed class YoutubeExplodeService : IYouTubeService
             Duration: video.Duration ?? TimeSpan.Zero,
             ThumbnailUrl: thumb,
             BestAudio: bestAudio,
-            VideoOptions: videoOptions);
+            VideoOptions: videoOptions,
+            BestOpusAudio: bestOpus);
     }
 
     public async Task DownloadStreamAsync(IStreamInfo stream, string filePath, IProgress<double>? progress, CancellationToken ct)

@@ -34,6 +34,7 @@ public partial class App : Application
         services.AddSingleton<IFileRevealer, ExplorerFileRevealer>();
         services.AddSingleton<IClipboardService, WpfClipboardService>();
         services.AddSingleton<IConfirmationService, MessageBoxConfirmationService>();
+        services.AddSingleton<IFoobar2000Launcher, NullFoobar2000Launcher>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

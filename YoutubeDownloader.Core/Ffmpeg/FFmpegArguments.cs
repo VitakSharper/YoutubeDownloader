@@ -7,4 +7,7 @@ public static class FFmpegArguments
 
     public static string ForMuxMp4(string videoInput, string audioInput, string output)
         => $"-y -i \"{videoInput}\" -i \"{audioInput}\" -c:v copy -c:a aac -movflags +faststart \"{output}\"";
+
+    public static string ForRemuxOpus(string input, string output)
+        => $"-y -i \"{input}\" -vn -c:a copy \"{output}\"";
 }
