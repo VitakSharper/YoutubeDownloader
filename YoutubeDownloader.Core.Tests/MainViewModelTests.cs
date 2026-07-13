@@ -19,6 +19,7 @@ public class MainViewModelTests
     private readonly Mock<ISettingsStore> _settings = new();
     private readonly Mock<IClipboardService> _clipboard = new();
     private readonly Mock<IConfirmationService> _confirm = new();
+    private readonly Mock<IFoobar2000Launcher> _foobar = new();
 
     public MainViewModelTests()
     {
@@ -30,7 +31,7 @@ public class MainViewModelTests
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
-            _confirm.Object);
+            _confirm.Object, _foobar.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true) => new(
         Title: "Test Video",
@@ -386,6 +387,50 @@ public class MainViewModelTests
         vm.OpenFolderCommand.Execute(new HistoryEntry { FilePath = "" });
 
         _fileRevealer.Verify(r => r.RevealInFolder(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void OpenInFoobar_WhenInstalledWithFile_LaunchesIt()
+    {
+        _foobar.SetupGet(f => f.IsInstalled).Returns(true);
+        var vm = CreateSut();
+
+        vm.OpenInFoobarCommand.Execute(new HistoryEntry { FilePath = @"C:\out\song.opus" });
+
+        _foobar.Verify(f => f.Open(@"C:\out\song.opus"), Times.Once);
+    }
+
+    [Fact]
+    public void OpenInFoobar_WhenNotInstalled_DoesNotLaunch()
+    {
+        _foobar.SetupGet(f => f.IsInstalled).Returns(false);
+        var vm = CreateSut();
+
+        vm.OpenInFoobarCommand.Execute(new HistoryEntry { FilePath = @"C:\out\song.opus" });
+
+        _foobar.Verify(f => f.Open(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void OpenInFoobar_NullEntryOrNoFilePath_DoesNotLaunch()
+    {
+        _foobar.SetupGet(f => f.IsInstalled).Returns(true);
+        var vm = CreateSut();
+
+        vm.OpenInFoobarCommand.Execute(null);
+        vm.OpenInFoobarCommand.Execute(new HistoryEntry { FilePath = "" });
+
+        _foobar.Verify(f => f.Open(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void FoobarTooltip_ReflectsInstalledState()
+    {
+        _foobar.SetupGet(f => f.IsInstalled).Returns(false);
+        Assert.Equal("foobar2000 is not installed", CreateSut().FoobarTooltip);
+
+        _foobar.SetupGet(f => f.IsInstalled).Returns(true);
+        Assert.Equal("Open in foobar2000", CreateSut().FoobarTooltip);
     }
 
     [Fact]

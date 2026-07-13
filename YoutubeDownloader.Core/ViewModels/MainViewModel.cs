@@ -23,12 +23,13 @@ public partial class MainViewModel : ObservableObject
     private readonly ISettingsStore _settings;
     private readonly IClipboardService _clipboard;
     private readonly IConfirmationService _confirm;
+    private readonly IFoobar2000Launcher _foobar;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
         IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
-        IConfirmationService confirm)
+        IConfirmationService confirm, IFoobar2000Launcher foobar)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -41,6 +42,7 @@ public partial class MainViewModel : ObservableObject
         _settings = settings;
         _clipboard = clipboard;
         _confirm = confirm;
+        _foobar = foobar;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -439,6 +441,27 @@ public partial class MainViewModel : ObservableObject
         catch
         {
             // best-effort: a missing/locked path shouldn't disrupt the UI
+        }
+    }
+
+    public bool IsFoobarInstalled => _foobar.IsInstalled;
+
+    public string FoobarTooltip =>
+        IsFoobarInstalled ? "Open in foobar2000" : "foobar2000 is not installed";
+
+    /// <summary>Play a downloaded file in foobar2000 (no-op unless installed).</summary>
+    [RelayCommand]
+    private void OpenInFoobar(HistoryEntry? entry)
+    {
+        if (entry is null || string.IsNullOrEmpty(entry.FilePath) || !_foobar.IsInstalled)
+            return;
+        try
+        {
+            _foobar.Open(entry.FilePath);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Couldn't open foobar2000: {ex.Message}";
         }
     }
 
