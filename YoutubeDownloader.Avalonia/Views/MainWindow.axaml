@@ -111,8 +111,9 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <TextBlock Classes="label" Text="MP3 BITRATE" />
+            <TextBlock Classes="label" Text="MP3 BITRATE" IsVisible="{Binding ShowBitrate}" />
             <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,0,0,6"
+                      IsVisible="{Binding ShowBitrate}"
                       ItemsSource="{Binding Bitrates}" SelectedItem="{Binding SelectedBitrate}">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="models:Mp3Bitrate">
