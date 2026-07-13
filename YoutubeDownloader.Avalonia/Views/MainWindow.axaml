@@ -210,6 +210,12 @@
                                         IsVisible="{Binding FilePath, Converter={StaticResource NotEmpty}}"
                                         Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenFolderCommand}"
                                         CommandParameter="{Binding}" />
+                                <Button Classes="chip" Content="▶ foobar"
+                                        IsVisible="{Binding FilePath, Converter={StaticResource NotEmpty}}"
+                                        IsEnabled="{Binding #Root.((vm:MainViewModel)DataContext).IsFoobarInstalled}"
+                                        ToolTip.Tip="{Binding #Root.((vm:MainViewModel)DataContext).FoobarTooltip}"
+                                        Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenInFoobarCommand}"
+                                        CommandParameter="{Binding}" />
                                 <Button Classes="chip" Content="✕"
                                         Command="{Binding #Root.((vm:MainViewModel)DataContext).RemoveEntryCommand}"
                                         CommandParameter="{Binding}" />

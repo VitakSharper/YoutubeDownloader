@@ -41,7 +41,7 @@ public partial class App : Application
         services.AddSingleton<AvaloniaClipboardService>();
         services.AddSingleton<IClipboardService>(sp => sp.GetRequiredService<AvaloniaClipboardService>());
         services.AddSingleton<IConfirmationService, AvaloniaConfirmationService>();
-        services.AddSingleton<IFoobar2000Launcher, NullFoobar2000Launcher>();
+        services.AddSingleton<IFoobar2000Launcher, Foobar2000Launcher>();
         var currentVersion = typeof(App).Assembly.GetName().Version ?? new Version(1, 0, 0);
         var updateHttp = new HttpClient();
         services.AddSingleton<IUpdateService>(_ =>
