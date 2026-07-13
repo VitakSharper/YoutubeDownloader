@@ -256,14 +256,15 @@ public partial class MainViewModel : ObservableObject
     private async Task DownloadAsync()
     {
         var info = VideoInfo!;
+        var mode = SelectedMode;
 
-        if (SelectedMode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
+        if (mode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
         {
             StatusMessage = "This video has no Opus audio stream to save.";
             return;
         }
 
-        var ext = SelectedMode switch
+        var ext = mode switch
         {
             DownloadMode.AudioMp3 => "mp3",
             DownloadMode.AudioOpus => "opus",
@@ -293,7 +294,7 @@ public partial class MainViewModel : ObservableObject
             var ffmpegPath = await _ffmpeg.EnsureAsync(
                 new Progress<double>(p => Progress = p * 0.1), token);
 
-            if (SelectedMode == DownloadMode.AudioMp3)
+            if (mode == DownloadMode.AudioMp3)
             {
                 StatusMessage = "Downloading audio…";
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
@@ -306,7 +307,7 @@ public partial class MainViewModel : ObservableObject
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"MP3 · {(int)SelectedBitrate} kbps";
             }
-            else if (SelectedMode == DownloadMode.AudioOpus)
+            else if (mode == DownloadMode.AudioOpus)
             {
                 StatusMessage = "Downloading audio…";
                 var tempAudio = _temp.NewTempFile(info.BestOpusAudio!.Container);

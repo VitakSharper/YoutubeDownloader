@@ -663,6 +663,33 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task Download_ModeChangedMidFlight_UsesModeCapturedAtStart()
+    {
+        var info = SampleInfo(withOpus: false); // no Opus stream available
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.AudioMp3;
+
+        // Simulate the user flipping FORMAT to Opus mid-download (during the ffmpeg bootstrap await).
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe")
+               .Callback(() => vm.SelectedMode = DownloadMode.AudioOpus);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        // Must honor the mode captured at start (MP3), not the flipped-to Opus (which would NPE on the null BestOpusAudio).
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _converter.Verify(c => c.RemuxToOpusAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public void ShowBitrate_HiddenOnlyForOpusMode()
     {
         var vm = CreateSut();
