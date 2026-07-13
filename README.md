@@ -10,7 +10,8 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 
 ## Features
 
-- **Download audio or video** — save as **MP3** (selectable bitrate) or **video** (selectable quality).
+- **Download audio or video** — save audio as **MP3** (selectable bitrate) or **Opus** (native, no re-encode), or **video** (selectable quality).
+- **Open in foobar2000** *(Avalonia)* — from any history entry with a saved file, open it in foobar2000 (button is disabled with a tooltip when foobar2000 isn't installed).
 - **Fetch first** — paste a link and see the title, author, and thumbnail before committing to a download.
 - **Smart quality hints** — warns you when the requested quality would upscale beyond what the source offers.
 - **Live progress** — a gradient progress bar tracks download + conversion.
@@ -19,7 +20,8 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
   - **Use** — drop the link back into the download box
   - **Open** — open the video in your browser
   - **Folder** — reveal the saved file in Explorer
-  - **Remove** a single entry, or **Clear all**
+  - **Remove** a single entry
+  - **Clear all** — now asks for confirmation first.
 - **Check for updates** *(Avalonia)* — a header button checks GitHub Releases and downloads the newest build for you to swap in.
 - **Remembers your last save folder** so you're not re-navigating every time.
 - **Always-on-top toggle** (on by default, persisted across restarts).
