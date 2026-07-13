@@ -6,7 +6,8 @@ public sealed record VideoInfo(
     TimeSpan Duration,
     string ThumbnailUrl,
     AudioStreamOption BestAudio,
-    IReadOnlyList<VideoStreamOption> VideoOptions)
+    IReadOnlyList<VideoStreamOption> VideoOptions,
+    AudioStreamOption? BestOpusAudio = null)
 {
     public int SourceAudioKbps => BestAudio.BitrateKbps;
 }
