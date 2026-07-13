@@ -29,4 +29,17 @@ public class FFmpegArgumentsTests
         Assert.Contains("-movflags +faststart", args);
         Assert.EndsWith("\"C:\\out.mp4\"", args);
     }
+
+    [Fact]
+    public void ForRemuxOpus_CopiesAudioStreamWithoutReencode()
+    {
+        var args = FFmpegArguments.ForRemuxOpus(@"C:\in.webm", @"C:\out.opus");
+
+        Assert.StartsWith("-y", args);
+        Assert.Contains("-i \"C:\\in.webm\"", args);
+        Assert.Contains("-vn", args);
+        Assert.Contains("-c:a copy", args);
+        Assert.DoesNotContain("libopus", args);
+        Assert.EndsWith("\"C:\\out.opus\"", args);
+    }
 }
