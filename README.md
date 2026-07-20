@@ -1,17 +1,17 @@
 # 🎀 Liudochka Youtube Downloader
 
-A small, friendly Windows desktop app for grabbing **audio and video from any YouTube link** — pick a format, pick a quality, and download. Built on .NET 8 with a frosted-glass cassette theme. Ships as an **Avalonia** app (the actively developed UI, with in-app updates) plus the original **WPF** build; both share the same core.
+A small, friendly Windows desktop app for grabbing **audio and video from any YouTube link** — pick a format, pick a quality, and download. Built on .NET 8 with a frosted-glass cassette theme. Ships as an **Avalonia** app with in-app updates.
 
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
-![UI](https://img.shields.io/badge/UI-Avalonia%20%2B%20WPF-2C3E50)
+![UI](https://img.shields.io/badge/UI-Avalonia-2C3E50)
 
 ![Liudochka Youtube Downloader](docs/screenshot.png)
 
 ## Features
 
-- **Download audio or video** — save audio as **MP3** (selectable bitrate) or **Opus** (native, no re-encode), or **video** (selectable quality).
-- **Open in foobar2000** *(Avalonia)* — from any history entry with a saved file, open it in foobar2000 (button is disabled with a tooltip when foobar2000 isn't installed).
+- **Download audio or video** — save audio as **MP3** (best-quality VBR by default, or a fixed bitrate) or **Opus** (native, no re-encode), or **video** (selectable quality).
+- **Open in foobar2000** — from any history entry with a saved file, open it in foobar2000 (button is disabled with a tooltip when foobar2000 isn't installed).
 - **Fetch first** — paste a link and see the title, author, and thumbnail before committing to a download.
 - **Smart quality hints** — warns you when the requested quality would upscale beyond what the source offers.
 - **Live progress** — a gradient progress bar tracks download + conversion.
@@ -22,14 +22,14 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
   - **Folder** — reveal the saved file in Explorer
   - **Remove** a single entry
   - **Clear all** — now asks for confirmation first.
-- **Check for updates** *(Avalonia)* — a header button checks GitHub Releases and downloads the newest build for you to swap in.
+- **Check for updates** — a header button checks GitHub Releases and downloads the newest build for you to swap in.
 - **Remembers your last save folder** so you're not re-navigating every time.
 - **Always-on-top toggle** (on by default, persisted across restarts).
 - **No manual FFmpeg setup** — the required FFmpeg binaries are downloaded automatically on first use.
 
 ## Requirements
 
-- **Windows** — both UIs target Windows (WPF is `net8.0-windows`; the Avalonia build ships as a Windows x64 single file).
+- **Windows** — the Avalonia build ships as a Windows x64 single file.
 - **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** — only needed to build/run from source. A published release is self-contained and needs no .NET install.
 
 ## Getting started (from source)
@@ -38,11 +38,8 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 git clone https://github.com/VitakSharper/YoutubeDownloader.git
 cd YoutubeDownloader
 
-# Run the Avalonia app (primary UI)
+# Run the app
 dotnet run --project YoutubeDownloader.Avalonia
-
-# …or the original WPF app
-dotnet run --project YoutubeDownloader.App
 
 # Run the tests
 dotnet test
@@ -52,14 +49,13 @@ FFmpeg is fetched automatically into `%LocalAppData%\YoutubeDownloader\ffmpeg` t
 
 ## Building a standalone release
 
-A single self-contained `.exe` (no .NET runtime required on the target machine) can be produced with the included scripts:
+A single self-contained `.exe` (no .NET runtime required on the target machine) can be produced with the included script:
 
 ```sh
-release.cmd    # Avalonia build  -> dist\LiudochkaYoutubeDownloader.Avalonia.exe
-publish.cmd    # WPF build       -> dist\LiudochkaYoutubeDownloader.exe
+release.cmd    # -> dist\LiudochkaYoutubeDownloader.Avalonia.exe
 ```
 
-Each runs a Release publish for `win-x64` (single file, compressed) into `dist\`.
+It runs a Release publish for `win-x64` (single file, compressed) into `dist\`.
 
 ## In-app updates (Avalonia)
 
@@ -92,22 +88,19 @@ YoutubeDownloader.sln
 │  ├─ Services/                   YouTube access, FFmpeg, history, settings, updates, …
 │  ├─ ViewModels/                 MVVM view models (CommunityToolkit.Mvvm)
 │  ├─ Models/ · Helpers/ · Ffmpeg/
-├─ YoutubeDownloader.Avalonia/    Avalonia UI (net8.0) — primary, in-app updates
-├─ YoutubeDownloader.App/         WPF UI (net8.0-windows) — original
+├─ YoutubeDownloader.Avalonia/    Avalonia UI (net8.0) — in-app updates
 ├─ YoutubeDownloader.Core.Tests/  Unit tests (xUnit + Moq)
-├─ release.cmd                    Avalonia single-file release build
-└─ publish.cmd                    WPF single-file release build
+└─ release.cmd                    Single-file release build
 ```
 
-The UI is kept thin: all logic lives in `Core` behind interfaces and is wired up with `Microsoft.Extensions.DependencyInjection` in each app's composition root, which keeps the core testable and shared across both UIs.
+The UI is kept thin: all logic lives in `Core` behind interfaces and is wired up with `Microsoft.Extensions.DependencyInjection` in the app's composition root, which keeps the core testable.
 
 ## Built with
 
-- [Avalonia](https://avaloniaui.net/) — cross-platform .NET UI (primary app)
+- [Avalonia](https://avaloniaui.net/) — cross-platform .NET UI
 - [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode) — YouTube metadata and stream access
 - [Xabe.FFmpeg](https://github.com/tomaszzmuda/Xabe.FFmpeg) — media conversion + automatic FFmpeg download
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) — MVVM helpers
-- WPF on .NET 8 — original UI
 
 ## Disclaimer
 

@@ -88,17 +88,17 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void UpscaleWarning_ShownWhenBitrateExceedsSource_InAudioMode()
+    public void UpscaleWarning_ShownWhenQualityExceedsSource_InAudioMode()
     {
         var vm = CreateSut();
         typeof(MainViewModel).GetProperty(nameof(MainViewModel.VideoInfo))!
             .SetValue(vm, SampleInfo(sourceAudioKbps: 128));
         vm.SelectedMode = DownloadMode.AudioMp3;
 
-        vm.SelectedBitrate = Mp3Bitrate.Kbps320;
+        vm.SelectedQuality = Mp3Quality.Cbr320;
         Assert.NotNull(vm.UpscaleWarning);
 
-        vm.SelectedBitrate = Mp3Bitrate.Kbps128;
+        vm.SelectedQuality = Mp3Quality.Cbr128;
         Assert.Null(vm.UpscaleWarning);
     }
 
@@ -108,7 +108,7 @@ public class MainViewModelTests
         var vm = CreateSut();
         typeof(MainViewModel).GetProperty(nameof(MainViewModel.VideoInfo))!
             .SetValue(vm, SampleInfo(sourceAudioKbps: 128));
-        vm.SelectedBitrate = Mp3Bitrate.Kbps320;
+        vm.SelectedQuality = Mp3Quality.Cbr320;
         vm.SelectedMode = DownloadMode.Video;
 
         Assert.Null(vm.UpscaleWarning);
@@ -122,7 +122,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task Download_AudioMode_ConvertsWithSelectedBitrate()
+    public async Task Download_AudioMode_ConvertsWithSelectedQuality()
     {
         var info = SampleInfo();
         _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
@@ -135,12 +135,12 @@ public class MainViewModelTests
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
         await vm.FetchInfoCommand.ExecuteAsync(null);
         vm.SelectedMode = DownloadMode.AudioMp3;
-        vm.SelectedBitrate = Mp3Bitrate.Kbps256;
+        vm.SelectedQuality = Mp3Quality.Cbr256;
 
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(
-            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.mp3", 256,
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.mp3", Mp3Quality.Cbr256,
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(vm.IsBusy);
     }
@@ -199,7 +199,7 @@ public class MainViewModelTests
         var vm = CreateSut();
         vm.Url = "https://youtu.be/dQw4w9WgXcQ";
         await vm.FetchInfoCommand.ExecuteAsync(null);
-        vm.SelectedBitrate = Mp3Bitrate.Kbps256;
+        vm.SelectedQuality = Mp3Quality.Cbr256;
 
         await vm.DownloadCommand.ExecuteAsync(null);
 
@@ -221,7 +221,7 @@ public class MainViewModelTests
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
         _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
         _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
 
         var vm = CreateSut();
@@ -684,22 +684,51 @@ public class MainViewModelTests
 
         // Must honor the mode captured at start (MP3), not the flipped-to Opus (which would NPE on the null BestOpusAudio).
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _converter.Verify(c => c.RemuxToOpusAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public void ShowBitrate_HiddenOnlyForOpusMode()
+    public void ShowQuality_HiddenOnlyForOpusMode()
     {
         var vm = CreateSut();
 
         vm.SelectedMode = DownloadMode.AudioMp3;
-        Assert.True(vm.ShowBitrate);
+        Assert.True(vm.ShowQuality);
         vm.SelectedMode = DownloadMode.Video;
-        Assert.True(vm.ShowBitrate);
+        Assert.True(vm.ShowQuality);
         vm.SelectedMode = DownloadMode.AudioOpus;
-        Assert.False(vm.ShowBitrate);
+        Assert.False(vm.ShowQuality);
+    }
+
+    [Fact]
+    public void SelectedQuality_DefaultsToBestVbr()
+    {
+        Assert.Equal(Mp3Quality.BestVbr, CreateSut().SelectedQuality);
+    }
+
+    [Fact]
+    public async Task Download_DefaultVbr_ConvertsWithVbrAndRecordsVbrLabel()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        // SelectedQuality defaults to BestVbr — do not set it.
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _converter.Verify(c => c.ConvertToMp3Async(
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.mp3", Mp3Quality.BestVbr,
+            info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("MP3 · VBR V0 (~245 kbps)", Assert.Single(vm.History).Format);
     }
 
     [Fact]
@@ -722,7 +751,7 @@ public class MainViewModelTests
         _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.opus",
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal("Opus · 160 kbps", Assert.Single(vm.History).Format);
     }
 

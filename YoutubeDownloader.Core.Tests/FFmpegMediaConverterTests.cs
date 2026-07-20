@@ -1,3 +1,4 @@
+using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
 
 namespace YoutubeDownloader.Core.Tests;
@@ -11,7 +12,7 @@ public class FFmpegMediaConverterTests
         var missing = Path.Combine(Path.GetTempPath(), "definitely-not-ffmpeg-" + Guid.NewGuid().ToString("N") + ".exe");
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            converter.ConvertToMp3Async(missing, "in.webm", "out.mp3", 192, TimeSpan.FromSeconds(10), null, CancellationToken.None));
+            converter.ConvertToMp3Async(missing, "in.webm", "out.mp3", Mp3Quality.Cbr192, TimeSpan.FromSeconds(10), null, CancellationToken.None));
     }
 
     [Fact]

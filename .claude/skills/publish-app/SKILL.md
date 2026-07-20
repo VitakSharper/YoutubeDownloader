@@ -6,39 +6,45 @@ description: Use when the user says "publish", or asks to package/release/ship t
 # Publish — single self-contained executable
 
 ## Overview
-For this repo, **"publish" means: build `YoutubeDownloader.App` as ONE self-contained Windows executable** that runs without a .NET install. The deliverable is a single file: `LiudochkaYoutubeDownloader.exe`.
+For this repo, **"publish" means: build `YoutubeDownloader.Avalonia` as ONE self-contained Windows executable** that runs without a .NET install. The canonical flow is the repo's `release.cmd`, which publishes and zips the single-file exe into `dist\`. The deliverable is `dist\LiudochkaYoutubeDownloader.Avalonia.exe` (and a versioned `.zip` the in-app updater consumes).
 
 ## Command
-Run from the repo root (`C:\Repos\YoutubeDownloader`), single line:
+Run from the repo root (`C:\Repos\YoutubeDownloader`):
 
 ```
-dotnet publish YoutubeDownloader.App/YoutubeDownloader.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false
+.\release.cmd
+```
+
+`release.cmd` runs, in effect, this single-line publish (bump `set VERSION=` in the script + `<Version>` in the csproj first):
+
+```
+dotnet publish YoutubeDownloader.Avalonia/YoutubeDownloader.Avalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false -o dist
 ```
 
 ## Why each flag
 - `-r win-x64 --self-contained true` — bundle the .NET runtime so no install is needed on the target.
 - `-p:PublishSingleFile=true` — emit a single `.exe`.
-- `-p:IncludeNativeLibrariesForSelfExtract=true` — **required for WPF.** Bundles the native libs (`wpfgfx_cor3.dll`, `PresentationNative_cor3.dll`, `D3DCompiler_47_cor3.dll`, `PenImc_cor3.dll`, `vcruntime140_cor3.dll`) into the exe. Without it the publish folder ends up with **6 files instead of 1**.
-- `-p:EnableCompressionInSingleFile=true` — compresses the bundle (final exe ≈ 69 MB).
-- `-p:DebugType=none -p:DebugSymbols=false` — no stray `.pdb` left beside the exe.
+- `-p:IncludeNativeLibrariesForSelfExtract=true` — bundle Avalonia's native libs (Skia/HarfBuzz: `libSkiaSharp.dll`, `libHarfBuzzSharp.dll`, `av_libglesv2.dll`) into the exe so the publish folder is a single file rather than several.
+- `-p:EnableCompressionInSingleFile=true` — compresses the bundle.
+- `-p:DebugType=none -p:DebugSymbols=false` — no stray `.pdb` beside the exe.
 
 ## Output
 ```
-YoutubeDownloader.App\bin\Release\net8.0-windows\win-x64\publish\LiudochkaYoutubeDownloader.exe
+dist\LiudochkaYoutubeDownloader.Avalonia.exe
+dist\LiudochkaYoutubeDownloader.Avalonia-v<version>.zip
 ```
 
 ## After publishing — open the folder (always)
-Once the build succeeds, open the publish folder in File Explorer so the user can grab the exe:
-
 ```
-Start-Process explorer.exe -ArgumentList "C:\Repos\YoutubeDownloader\YoutubeDownloader.App\bin\Release\net8.0-windows\win-x64\publish"
+Start-Process explorer.exe -ArgumentList "C:\Repos\YoutubeDownloader\dist"
 ```
 
 (Use `Start-Process` rather than bare `explorer.exe` — Explorer returns a non-zero exit code even on success, which otherwise reads as a failed command.)
 
 ## Verify it really is single-file
-After publishing, the `publish` folder must contain **exactly one file** (the `.exe`). If you also see `*_cor3.dll` files, `IncludeNativeLibrariesForSelfExtract` was missing — clear the folder and rebuild.
+After publishing, `dist\` must contain the one `.exe` (plus the release `.zip`). If you also see `libSkiaSharp.dll` / `libHarfBuzzSharp.dll` / `av_libglesv2.dll` beside the exe, `IncludeNativeLibrariesForSelfExtract` was missing — clear the folder and rebuild.
 
 ## Gotchas
-- **"Device or resource busy" / "in use" when cleaning the publish folder:** caused by a shell whose working directory is inside that folder (or the app still running). Never `cd` into the publish folder before deleting it — delete it from the repo root, or use a fresh shell / `Remove-Item -Recurse -Force` from PowerShell.
-- First launch of the single-file exe self-extracts the native libs to a temp dir — this is normal for single-file WPF and happens only once per version.
+- **"Device or resource busy" / "in use" when cleaning `dist\`:** caused by a shell whose working directory is inside that folder (or the app still running). Never `cd` into `dist\` before deleting it — delete it from the repo root with `Remove-Item -Recurse -Force dist`.
+- First launch of the single-file exe self-extracts the native libs to a temp dir — normal for single-file, happens once per version.
+- To cut a GitHub release, after `release.cmd`: `gh release create v<version> "dist\LiudochkaYoutubeDownloader.Avalonia-v<version>.zip" --title "v<version>" --notes "…"`.

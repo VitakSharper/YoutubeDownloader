@@ -8,7 +8,6 @@
     <conv:NullToBoolConverter x:Key="NotNull" />
     <conv:StringNotEmptyToBoolConverter x:Key="NotEmpty" />
     <conv:DownloadModeDisplayConverter x:Key="ModeDisplay" />
-    <conv:Mp3BitrateDisplayConverter x:Key="BitrateDisplay" />
 
     <SolidColorBrush x:Key="AccentBrush" Color="#A855F7" />
     <SolidColorBrush x:Key="CardBrush" Color="#1A1726" />
