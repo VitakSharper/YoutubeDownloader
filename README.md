@@ -49,13 +49,13 @@ FFmpeg is fetched automatically into `%LocalAppData%\YoutubeDownloader\ffmpeg` t
 
 ## Building a standalone release
 
-A single self-contained `.exe` (no .NET runtime required on the target machine) can be produced with the included scripts:
+A single self-contained `.exe` (no .NET runtime required on the target machine) can be produced with the included script:
 
 ```sh
 release.cmd    # -> dist\LiudochkaYoutubeDownloader.Avalonia.exe
 ```
 
-Each runs a Release publish for `win-x64` (single file, compressed) into `dist\`.
+It runs a Release publish for `win-x64` (single file, compressed) into `dist\`.
 
 ## In-app updates (Avalonia)
 
@@ -97,7 +97,7 @@ The UI is kept thin: all logic lives in `Core` behind interfaces and is wired up
 
 ## Built with
 
-- [Avalonia](https://avaloniaui.net/) — cross-platform .NET UI (primary app)
+- [Avalonia](https://avaloniaui.net/) — cross-platform .NET UI
 - [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode) — YouTube metadata and stream access
 - [Xabe.FFmpeg](https://github.com/tomaszzmuda/Xabe.FFmpeg) — media conversion + automatic FFmpeg download
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) — MVVM helpers

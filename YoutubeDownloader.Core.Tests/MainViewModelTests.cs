@@ -88,7 +88,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void UpscaleWarning_ShownWhenBitrateExceedsSource_InAudioMode()
+    public void UpscaleWarning_ShownWhenQualityExceedsSource_InAudioMode()
     {
         var vm = CreateSut();
         typeof(MainViewModel).GetProperty(nameof(MainViewModel.VideoInfo))!
