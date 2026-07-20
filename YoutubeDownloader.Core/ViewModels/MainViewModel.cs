@@ -115,12 +115,12 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpscaleWarning))]
-    [NotifyPropertyChangedFor(nameof(ShowBitrate))]
+    [NotifyPropertyChangedFor(nameof(ShowQuality))]
     private DownloadMode _selectedMode = DownloadMode.AudioMp3;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpscaleWarning))]
-    private Mp3Bitrate _selectedBitrate = Mp3Bitrate.Kbps192;
+    private Mp3Quality _selectedQuality = Mp3Quality.BestVbr;
 
     [ObservableProperty]
     private VideoStreamOption? _selectedVideoQuality;
@@ -152,17 +152,17 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
-    public IReadOnlyList<Mp3Bitrate> Bitrates { get; } = Enum.GetValues<Mp3Bitrate>();
+    public IReadOnlyList<Mp3Quality> Qualities { get; } = Mp3Quality.All;
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
 
-    /// <summary>Bitrate only applies to MP3; hidden for the copy-only Opus mode.</summary>
-    public bool ShowBitrate => SelectedMode != DownloadMode.AudioOpus;
+    /// <summary>Quality only applies to MP3; hidden for the copy-only Opus mode.</summary>
+    public bool ShowQuality => SelectedMode != DownloadMode.AudioOpus;
 
     public string? UpscaleWarning =>
         VideoInfo is not null
         && SelectedMode == DownloadMode.AudioMp3
-        && QualityAdvisor.WouldUpscale(VideoInfo.SourceAudioKbps, (int)SelectedBitrate)
-            ? $"Selected {(int)SelectedBitrate} kbps is higher than the source audio " +
+        && QualityAdvisor.WouldUpscale(VideoInfo.SourceAudioKbps, SelectedQuality.ApproxKbps)
+            ? $"Selected {SelectedQuality.Label} is higher than the source audio " +
               $"({VideoInfo.SourceAudioKbps} kbps); this won't add real quality."
             : null;
 
@@ -257,6 +257,7 @@ public partial class MainViewModel : ObservableObject
     {
         var info = VideoInfo!;
         var mode = SelectedMode;
+        var quality = SelectedQuality;
 
         if (mode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
         {
@@ -302,10 +303,10 @@ public partial class MainViewModel : ObservableObject
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
-                StatusMessage = $"Converting to MP3 ({(int)SelectedBitrate} kbps)…";
-                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, (int)SelectedBitrate,
+                StatusMessage = $"Converting to MP3 ({quality.Label})…";
+                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, quality,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
-                formatLabel = $"MP3 · {(int)SelectedBitrate} kbps";
+                formatLabel = $"MP3 · {quality.HistoryLabel}";
             }
             else if (mode == DownloadMode.AudioOpus)
             {
@@ -322,15 +323,15 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
-                var quality = SelectedVideoQuality ?? info.VideoOptions.First();
-                formatLabel = $"MP4 · {quality.QualityLabel}";
-                StatusMessage = $"Downloading video ({quality.QualityLabel})…";
-                var tempVideo = _temp.NewTempFile(quality.Container);
+                var videoQuality = SelectedVideoQuality ?? info.VideoOptions.First();
+                formatLabel = $"MP4 · {videoQuality.QualityLabel}";
+                StatusMessage = $"Downloading video ({videoQuality.QualityLabel})…";
+                var tempVideo = _temp.NewTempFile(videoQuality.Container);
                 tempFiles.Add(tempVideo);
                 var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
                 tempFiles.Add(tempAudio);
 
-                await _youtube.DownloadStreamAsync(quality.Source, tempVideo,
+                await _youtube.DownloadStreamAsync(videoQuality.Source, tempVideo,
                     new Progress<double>(p => Progress = 0.1 + p * 0.4), token);
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
                     new Progress<double>(p => Progress = 0.5 + p * 0.2), token);

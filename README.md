@@ -10,7 +10,7 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 
 ## Features
 
-- **Download audio or video** — save audio as **MP3** (selectable bitrate) or **Opus** (native, no re-encode), or **video** (selectable quality).
+- **Download audio or video** — save audio as **MP3** (best-quality VBR by default, or a fixed bitrate) or **Opus** (native, no re-encode), or **video** (selectable quality).
 - **Open in foobar2000** — from any history entry with a saved file, open it in foobar2000 (button is disabled with a tooltip when foobar2000 isn't installed).
 - **Fetch first** — paste a link and see the title, author, and thumbnail before committing to a download.
 - **Smart quality hints** — warns you when the requested quality would upscale beyond what the source offers.
