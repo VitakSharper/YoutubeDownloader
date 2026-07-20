@@ -8,14 +8,16 @@ public partial class ConfirmDialog : Window
     public ConfirmDialog() // parameterless ctor for the XAML loader / designer
     {
         AvaloniaXamlLoader.Load(this);
-        YesButton.Click += (_, _) => Close(true);
-        NoButton.Click += (_, _) => Close(false);
+        // Load populates the NameScope but NOT the generated x:Name fields (they stay null),
+        // so resolve controls via FindControl — matching the pattern in MainWindow.
+        this.FindControl<Button>("YesButton")!.Click += (_, _) => Close(true);
+        this.FindControl<Button>("NoButton")!.Click += (_, _) => Close(false);
     }
 
     public ConfirmDialog(string title, string message) : this()
     {
         Title = title;
-        TitleText.Text = title;
-        MessageText.Text = message;
+        this.FindControl<TextBlock>("TitleText")!.Text = title;
+        this.FindControl<TextBlock>("MessageText")!.Text = message;
     }
 }
