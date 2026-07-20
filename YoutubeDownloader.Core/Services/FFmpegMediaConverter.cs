@@ -7,7 +7,7 @@ public sealed class FFmpegMediaConverter : IMediaConverter
 {
     public Task ConvertToMp3Async(string ffmpegPath, string input, string output, int bitrateKbps,
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
-        => RunAsync(ffmpegPath, FFmpegArguments.ForMp3(input, output, bitrateKbps), duration, progress, ct);
+        => RunAsync(ffmpegPath, FFmpegArguments.ForMp3Cbr(input, output, bitrateKbps), duration, progress, ct);
 
     public Task MuxToMp4Async(string ffmpegPath, string videoInput, string audioInput, string output,
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
