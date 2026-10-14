@@ -42,7 +42,7 @@ Start-Process explorer.exe -ArgumentList "C:\Repos\YoutubeDownloader\dist"
 (Use `Start-Process` rather than bare `explorer.exe` — Explorer returns a non-zero exit code even on success, which otherwise reads as a failed command.)
 
 ## Verify it really is single-file
-After publishing, `dist\` must contain the one `.exe` (plus the release `.zip`). If you also see `libSkiaSharp.dll` / `libHarfBuzzSharp.dll` / `av_libglesv2.dll` beside the exe, `IncludeNativeLibrariesForSelfExtract` was missing — clear the folder and rebuild.
+After publishing, `dist\` must contain the one `.exe` (plus the release `.zip`). If you also see `libSkiaSharp.dll` / `libHarfBuzzSharp.dll` / `av_libglesv2.dll` beside the exe, `IncludeNativeLibrariesForSelfExtract` was missing — clear the folder and rebuild. If you see libSkiaSharp.pdb / libHarfBuzzSharp.pdb beside the exe, the csproj target ExcludeNativePdbsFromPublish is missing (SkiaSharp 3, from Avalonia 12, ships native .pdb files that DebugType=none does not suppress).
 
 ## Gotchas
 - **"Device or resource busy" / "in use" when cleaning `dist\`:** caused by a shell whose working directory is inside that folder (or the app still running). Never `cd` into `dist\` before deleting it — delete it from the repo root with `Remove-Item -Recurse -Force dist`.
