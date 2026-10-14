@@ -28,4 +28,12 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
+
+  <!-- SkiaSharp 3 / HarfBuzzSharp native packages ship .pdb files that are not bundled into the
+       single-file exe; keep them out of the publish folder so release.cmd's dist\ stays one file. -->
+  <Target Name="ExcludeNativePdbsFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
 </Project>
