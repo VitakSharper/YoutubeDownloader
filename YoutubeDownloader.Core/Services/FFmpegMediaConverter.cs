@@ -37,10 +37,22 @@ public sealed class FFmpegMediaConverter : IMediaConverter
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var totalSeconds = duration.TotalSeconds;
+        const int StderrTailLines = 20;
+        var stderrTail = new Queue<string>(StderrTailLines);
 
         process.ErrorDataReceived += (_, e) =>
         {
-            if (e.Data is null || totalSeconds <= 0 || progress is null)
+            if (e.Data is null)
+                return;
+
+            lock (stderrTail)
+            {
+                if (stderrTail.Count == StderrTailLines)
+                    stderrTail.Dequeue();
+                stderrTail.Enqueue(e.Data);
+            }
+
+            if (totalSeconds <= 0 || progress is null)
                 return;
             if (FFmpegProgressParser.TryParseTimeSeconds(e.Data, out var seconds))
                 progress.Report(Math.Clamp(seconds / totalSeconds, 0.0, 1.0));
@@ -73,7 +85,14 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         }
 
         if (process.ExitCode != 0)
-            throw new InvalidOperationException($"FFmpeg exited with code {process.ExitCode}.");
+        {
+            string detail;
+            lock (stderrTail)
+                detail = FFmpegErrorSummary.From(stderrTail);
+            throw new InvalidOperationException(detail.Length == 0
+                ? $"FFmpeg exited with code {process.ExitCode}."
+                : $"FFmpeg exited with code {process.ExitCode}: {detail}");
+        }
 
         progress?.Report(1.0);
     }
