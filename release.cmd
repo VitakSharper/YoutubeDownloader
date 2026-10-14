@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-set VERSION=1.3.1
+set VERSION=1.3.2
 echo Publishing + zipping Liudochka Youtube Downloader (Avalonia) v%VERSION% ...
 echo.
 
