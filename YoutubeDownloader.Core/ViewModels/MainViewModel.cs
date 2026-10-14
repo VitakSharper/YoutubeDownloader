@@ -96,6 +96,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(FetchInfoCommand))]
     [NotifyCanExecuteChangedFor(nameof(DownloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UseEntryCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -151,6 +152,18 @@ public partial class MainViewModel : ObservableObject
     private string? _dismissedVideoId;
 
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
+
+    /// <summary>Drop the loaded video when the URL box now points at a different video.</summary>
+    partial void OnUrlChanged(string value)
+    {
+        if (VideoInfo is null)
+            return;
+        if (YouTubeUrlValidator.GetVideoId(value) == YouTubeUrlValidator.GetVideoId(VideoInfo.SourceUrl))
+            return; // same video, e.g. a timestamp or a different URL form
+        VideoInfo = null;
+        SelectedVideoQuality = null;
+        StatusMessage = "Press Fetch to load this link.";
+    }
 
     public IReadOnlyList<Mp3Quality> Qualities { get; } = Mp3Quality.All;
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
@@ -258,6 +271,7 @@ public partial class MainViewModel : ObservableObject
         var info = VideoInfo!;
         var mode = SelectedMode;
         var quality = SelectedQuality;
+        var selectedVideoQuality = SelectedVideoQuality;
 
         if (mode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
         {
@@ -323,7 +337,7 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
-                var videoQuality = SelectedVideoQuality ?? info.VideoOptions.First();
+                var videoQuality = selectedVideoQuality ?? info.VideoOptions.First();
                 formatLabel = $"MP4 · {videoQuality.QualityLabel}";
                 StatusMessage = $"Downloading video ({videoQuality.QualityLabel})…";
                 var tempVideo = _temp.NewTempFile(videoQuality.Container);
@@ -343,7 +357,7 @@ public partial class MainViewModel : ObservableObject
 
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
-            RecordHistory(info.Title, formatLabel, target);
+            RecordHistory(info.SourceUrl, info.Title, formatLabel, target);
         }
         catch (OperationCanceledException)
         {
@@ -389,11 +403,11 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RecordHistory(string title, string format, string filePath)
+    private void RecordHistory(string url, string title, string format, string filePath)
     {
         History.Insert(0, new HistoryEntry
         {
-            Url = Url,
+            Url = url,
             Title = title,
             Format = format,
             FilePath = filePath,
@@ -404,15 +418,20 @@ public partial class MainViewModel : ObservableObject
         _history.Save(History);
     }
 
-    /// <summary>Re-load a past link into the URL box and switch to the Download tab.</summary>
-    [RelayCommand]
-    private void UseEntry(HistoryEntry? entry)
+    /// <summary>Re-load a past link into the URL box, switch to the Download tab, and fetch it.</summary>
+    [RelayCommand(CanExecute = nameof(CanUseEntry))]
+    private async Task UseEntryAsync(HistoryEntry? entry)
     {
         if (entry is null)
             return;
         Url = entry.Url;
         SelectedTabIndex = 0;
+
+        if (FetchInfoCommand.CanExecute(null))
+            await FetchInfoCommand.ExecuteAsync(null);
     }
+
+    private bool CanUseEntry() => !IsBusy;
 
     /// <summary>Open a past link in the default browser.</summary>
     [RelayCommand]

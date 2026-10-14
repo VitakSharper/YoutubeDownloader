@@ -31,6 +31,7 @@ public sealed class YoutubeExplodeService : IYouTubeService
         var thumb = video.Thumbnails.OrderByDescending(t => t.Resolution.Area).FirstOrDefault()?.Url ?? "";
 
         return new VideoInfo(
+            SourceUrl: url,
             Title: video.Title,
             Author: video.Author.ChannelTitle,
             Duration: video.Duration ?? TimeSpan.Zero,
