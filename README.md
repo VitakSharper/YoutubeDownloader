@@ -5,6 +5,7 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![UI](https://img.shields.io/badge/UI-Avalonia-2C3E50)
+![CI](https://github.com/VitakSharper/YoutubeDownloader/actions/workflows/ci.yml/badge.svg)
 
 ![Liudochka Youtube Downloader](docs/screenshot.png)
 
@@ -61,7 +62,7 @@ It runs a Release publish for `win-x64` (single file, compressed) into `dist\`.
 
 The Avalonia app has a manual **Check for updates** button in the header that queries this repo's GitHub Releases. To cut a release:
 
-1. Bump `<Version>` in `YoutubeDownloader.Avalonia.csproj` (and `VERSION` in `release.cmd`).
+1. Bump `<Version>` in `YoutubeDownloader.Avalonia.csproj` — `release.cmd` reads the version from it.
 2. Run `release.cmd` — it publishes the single-file exe and zips it to `dist\`.
 3. Publish the release (public):
    `gh release create v<version> "dist\LiudochkaYoutubeDownloader.Avalonia-v<version>.zip" --title "v<version>" --notes "…"`
