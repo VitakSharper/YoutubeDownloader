@@ -96,6 +96,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(FetchInfoCommand))]
     [NotifyCanExecuteChangedFor(nameof(DownloadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UseEntryCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -417,15 +418,20 @@ public partial class MainViewModel : ObservableObject
         _history.Save(History);
     }
 
-    /// <summary>Re-load a past link into the URL box and switch to the Download tab.</summary>
-    [RelayCommand]
-    private void UseEntry(HistoryEntry? entry)
+    /// <summary>Re-load a past link into the URL box, switch to the Download tab, and fetch it.</summary>
+    [RelayCommand(CanExecute = nameof(CanUseEntry))]
+    private async Task UseEntryAsync(HistoryEntry? entry)
     {
         if (entry is null)
             return;
         Url = entry.Url;
         SelectedTabIndex = 0;
+
+        if (FetchInfoCommand.CanExecute(null))
+            await FetchInfoCommand.ExecuteAsync(null);
     }
+
+    private bool CanUseEntry() => !IsBusy;
 
     /// <summary>Open a past link in the default browser.</summary>
     [RelayCommand]

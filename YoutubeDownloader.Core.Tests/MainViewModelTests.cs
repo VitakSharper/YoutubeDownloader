@@ -252,15 +252,127 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void UseEntry_SetsUrlAndSwitchesToDownloadTab()
+    public async Task UseEntry_SetsUrlSwitchesTabAndFetches()
     {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
         var vm = CreateSut();
         vm.SelectedTabIndex = 1;
 
-        vm.UseEntryCommand.Execute(new HistoryEntry { Url = "https://youtu.be/zzz" });
+        await vm.UseEntryCommand.ExecuteAsync(new HistoryEntry { Url = "https://youtu.be/dQw4w9WgXcQ" });
 
-        Assert.Equal("https://youtu.be/zzz", vm.Url);
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", vm.Url);
         Assert.Equal(0, vm.SelectedTabIndex);
+        Assert.Same(info, vm.VideoInfo);
+        _youtube.Verify(s => s.GetVideoInfoAsync("https://youtu.be/dQw4w9WgXcQ", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void UseEntry_CannotExecute_WhileBusy()
+    {
+        var vm = CreateSut();
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.IsBusy))!.SetValue(vm, true);
+
+        Assert.False(vm.UseEntryCommand.CanExecute(new HistoryEntry { Url = "https://youtu.be/dQw4w9WgXcQ" }));
+    }
+
+    [Fact]
+    public async Task Url_ChangedToDifferentVideo_ClearsVideoInfoAndDisablesDownload()
+    {
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(SampleInfo());
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        vm.Url = "https://youtu.be/oHg5SJYRHA0";
+
+        Assert.Null(vm.VideoInfo);
+        Assert.Null(vm.SelectedVideoQuality);
+        Assert.False(vm.DownloadCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Url_ChangedToSameVideoDifferentForm_KeepsVideoInfo()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        vm.Url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s";
+
+        Assert.Same(info, vm.VideoInfo);
+        Assert.True(vm.DownloadCommand.CanExecute(null));
+    }
+
+    private void SetupMp3Download(VideoInfo info)
+    {
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+    }
+
+    [Fact]
+    public async Task Download_AfterUrlEditedToSameVideo_RecordsFetchedUrl()
+    {
+        SetupMp3Download(SampleInfo(sourceUrl: "https://youtu.be/dQw4w9WgXcQ"));
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.Url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s";
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", Assert.Single(vm.History).Url);
+    }
+
+    [Fact]
+    public async Task Download_UrlChangedMidFlight_RecordsFetchedUrlAndFinishes()
+    {
+        SetupMp3Download(SampleInfo());
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe")
+               .Callback(() => vm.Url = "https://youtu.be/oHg5SJYRHA0");
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Equal("https://youtu.be/dQw4w9WgXcQ", Assert.Single(vm.History).Url);
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_VideoQualityChangedMidFlight_UsesQualityCapturedAtStart()
+    {
+        var q1080 = new VideoStreamOption("1080p", 1080, "mp4", Source: null!);
+        var q720 = new VideoStreamOption("720p", 720, "mp4", Source: null!);
+        var info = new VideoInfo(
+            SourceUrl: "https://youtu.be/dQw4w9WgXcQ",
+            Title: "Test Video",
+            Author: "Tester",
+            Duration: TimeSpan.FromMinutes(3),
+            ThumbnailUrl: "",
+            BestAudio: new AudioStreamOption("opus", 128, "webm", Source: null!),
+            VideoOptions: new[] { q1080, q720 });
+        SetupMp3Download(info);
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+        vm.SelectedVideoQuality = q720;
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe")
+               .Callback(() => vm.SelectedVideoQuality = null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Equal("MP4 · 720p", Assert.Single(vm.History).Format);
     }
 
     [Fact]
