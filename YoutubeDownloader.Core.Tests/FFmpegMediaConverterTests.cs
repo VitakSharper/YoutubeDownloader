@@ -55,6 +55,35 @@ public class FFmpegMediaConverterTests
         try { File.Delete(heartbeat); } catch { /* best effort cleanup */ }
     }
 
+    [Fact]
+    public async Task RunAsync_WhenProcessFails_MessageIncludesStderrCause()
+    {
+        const string script =
+            "[Console]::Error.WriteLine('size=     256kB time=00:00:10.00 bitrate= 209.7kbits/s'); " +
+            "[Console]::Error.WriteLine('C:\\in.webm: Invalid data found when processing input'); " +
+            "[Console]::Error.WriteLine('Conversion failed!'); exit 1";
+        var arguments = $"-NoProfile -NonInteractive -Command \"{script}\"";
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FFmpegMediaConverter.RunAsync("powershell.exe", arguments, TimeSpan.Zero, null, CancellationToken.None));
+
+        Assert.Contains("code 1", ex.Message);
+        Assert.Contains("Invalid data found when processing input", ex.Message);
+        Assert.DoesNotContain("Conversion failed!", ex.Message);
+        Assert.DoesNotContain("time=00:00:10.00", ex.Message);
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenProcessFailsSilently_FallsBackToExitCodeOnly()
+    {
+        var arguments = "-NoProfile -NonInteractive -Command \"exit 3\"";
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FFmpegMediaConverter.RunAsync("powershell.exe", arguments, TimeSpan.Zero, null, CancellationToken.None));
+
+        Assert.Equal("FFmpeg exited with code 3.", ex.Message);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
