@@ -1,6 +1,7 @@
 using System.IO;
 using Avalonia.Platform.Storage;
 using YoutubeDownloader.Avalonia.Infrastructure;
+using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Services;
 
 namespace YoutubeDownloader.Avalonia.Services;
@@ -13,7 +14,7 @@ public sealed class AvaloniaSaveFileService : ISaveFileService
         if (topLevel is null)
             return null;
 
-        var isMp3 = extension.Equals("mp3", StringComparison.OrdinalIgnoreCase);
+        var fileType = SaveFileTypes.For(extension);
         var options = new FilePickerSaveOptions
         {
             SuggestedFileName = suggestedFileName,
@@ -21,9 +22,7 @@ public sealed class AvaloniaSaveFileService : ISaveFileService
             ShowOverwritePrompt = true,
             FileTypeChoices = new[]
             {
-                isMp3
-                    ? new FilePickerFileType("MP3 audio") { Patterns = new[] { "*.mp3" } }
-                    : new FilePickerFileType("MP4 video") { Patterns = new[] { "*.mp4" } }
+                new FilePickerFileType(fileType.Label) { Patterns = new[] { fileType.Pattern } }
             }
         };
 
