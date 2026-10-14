@@ -33,6 +33,7 @@ public partial class App : Application
             new FFmpegLocator(sp.GetRequiredService<IFFmpegBinaryDownloader>(), ffmpegDir));
         services.AddSingleton<IMediaConverter, FFmpegMediaConverter>();
         services.AddSingleton<ITempFileService, TempFileService>();
+        services.AddSingleton<IOutputFileService, OutputFileService>();
         services.AddSingleton<ISaveFileService, AvaloniaSaveFileService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
         services.AddSingleton<ISettingsStore>(_ => new JsonSettingsStore(baseDir));

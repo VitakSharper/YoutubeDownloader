@@ -24,12 +24,13 @@ public partial class MainViewModel : ObservableObject
     private readonly IClipboardService _clipboard;
     private readonly IConfirmationService _confirm;
     private readonly IFoobar2000Launcher _foobar;
+    private readonly IOutputFileService _output;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
         IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
-        IConfirmationService confirm, IFoobar2000Launcher foobar)
+        IConfirmationService confirm, IFoobar2000Launcher foobar, IOutputFileService output)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -43,6 +44,7 @@ public partial class MainViewModel : ObservableObject
         _clipboard = clipboard;
         _confirm = confirm;
         _foobar = foobar;
+        _output = output;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -295,6 +297,8 @@ public partial class MainViewModel : ObservableObject
         }
 
         RememberSaveFolder(target);
+        var part = PartFilePath.For(target);
+        var committed = false;
 
         var tempFiles = new List<string>();
         string formatLabel = "";
@@ -318,7 +322,7 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = $"Converting to MP3 ({quality.Label})…";
-                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, target, quality,
+                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"MP3 · {quality.HistoryLabel}";
             }
@@ -331,7 +335,7 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = "Saving Opus audio…";
-                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, target,
+                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"Opus · {info.BestOpusAudio.BitrateKbps} kbps";
             }
@@ -351,10 +355,12 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.5 + p * 0.2), token);
 
                 StatusMessage = "Merging video + audio…";
-                await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, target,
+                await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, part,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
             }
 
+            _output.Commit(part, target);
+            committed = true;
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
             RecordHistory(info.SourceUrl, info.Title, formatLabel, target);
@@ -363,8 +369,6 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = "Download cancelled.";
             Progress = 0;
-            try { if (File.Exists(target)) File.Delete(target); }
-            catch { /* best-effort: partial output may be locked or already gone */ }
         }
         catch (Exception ex)
         {
@@ -376,6 +380,7 @@ public partial class MainViewModel : ObservableObject
             IsDownloading = false;
             _downloadCts?.Dispose();
             _downloadCts = null;
+            if (!committed) _output.Discard(part);
             foreach (var f in tempFiles)
             {
                 try { if (File.Exists(f)) File.Delete(f); }

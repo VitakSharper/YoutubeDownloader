@@ -1,5 +1,6 @@
 using Moq;
 using YoutubeExplode.Videos.Streams;
+using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
 using YoutubeDownloader.Core.ViewModels;
@@ -20,6 +21,7 @@ public class MainViewModelTests
     private readonly Mock<IClipboardService> _clipboard = new();
     private readonly Mock<IConfirmationService> _confirm = new();
     private readonly Mock<IFoobar2000Launcher> _foobar = new();
+    private readonly Mock<IOutputFileService> _output = new();
 
     public MainViewModelTests()
     {
@@ -31,7 +33,7 @@ public class MainViewModelTests
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
-            _confirm.Object, _foobar.Object);
+            _confirm.Object, _foobar.Object, _output.Object);
 
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true,
         string sourceUrl = "https://youtu.be/dQw4w9WgXcQ") => new(
@@ -142,7 +144,7 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(
-            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.mp3", Mp3Quality.Cbr256,
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.Cbr256,
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(vm.IsBusy);
     }
@@ -185,7 +187,7 @@ public class MainViewModelTests
         _youtube.Verify(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
             It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         _converter.Verify(c => c.MuxToMp4Async(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\v.mp4", @"C:\temp\a.webm",
-            @"C:\out\clip.mp4", info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+            @"C:\out\clip.part.mp4", info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -840,7 +842,7 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(
-            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.mp3", Mp3Quality.BestVbr,
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.BestVbr,
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal("MP3 · VBR V0 (~245 kbps)", Assert.Single(vm.History).Format);
     }
@@ -862,7 +864,7 @@ public class MainViewModelTests
 
         await vm.DownloadCommand.ExecuteAsync(null);
 
-        _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.opus",
+        _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.opus",
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -964,11 +966,11 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task Download_Cancelled_SetsCancelledStatusResetsProgressNoHistoryAndDeletesPartialFile()
+    public async Task Download_Cancelled_KeepsExistingTargetAndDiscardsPartFile()
     {
-        // A real file on disk stands in for the partially-written output.
+        // A real pre-existing file the user chose to overwrite: a cancelled run must leave it untouched.
         var target = Path.Combine(Path.GetTempPath(), $"cancel-test-{Guid.NewGuid():N}.mp3");
-        File.WriteAllText(target, "partial bytes");
+        File.WriteAllText(target, "original bytes");
 
         try
         {
@@ -1002,11 +1004,80 @@ public class MainViewModelTests
             Assert.Equal(0, vm.Progress);
             Assert.Empty(vm.History);
             Assert.False(vm.IsDownloading);
-            Assert.False(File.Exists(target));
+            Assert.Equal("original bytes", File.ReadAllText(target));
+            _output.Verify(o => o.Discard(PartFilePath.For(target)), Times.Once);
+            _output.Verify(o => o.Commit(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
         finally
         {
             if (File.Exists(target)) File.Delete(target);
         }
+    }
+
+    [Fact]
+    public async Task Download_Success_CommitsPartToTargetAndRecordsTarget()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _output.Verify(o => o.Commit(@"C:\out\song.part.mp3", @"C:\out\song.mp3"), Times.Once);
+        _output.Verify(o => o.Discard(It.IsAny<string>()), Times.Never);
+        Assert.Equal(@"C:\out\song.mp3", Assert.Single(vm.History).FilePath);
+    }
+
+    [Fact]
+    public async Task Download_Failure_DiscardsPartAndNeverCommits()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+        _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _output.Verify(o => o.Discard(@"C:\out\song.part.mp3"), Times.Once);
+        _output.Verify(o => o.Commit(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        Assert.StartsWith("Download failed", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Download_CommitFails_ReportsFailureAndRecordsNoHistory()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+        _output.Setup(o => o.Commit(It.IsAny<string>(), It.IsAny<string>())).Throws(new IOException("locked"));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Contains("locked", vm.StatusMessage);
+        Assert.Empty(vm.History);
+        _output.Verify(o => o.Discard(@"C:\out\song.part.mp3"), Times.Once);
     }
 }
