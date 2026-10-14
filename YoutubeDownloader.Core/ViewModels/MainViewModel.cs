@@ -309,7 +309,7 @@ public partial class MainViewModel : ObservableObject
             IsBusy = true;
             IsDownloading = true;
             Progress = 0;
-            StatusMessage = "Preparing FFmpeg…";
+            StatusMessage = _ffmpeg.IsAvailable ? "Preparing FFmpeg…" : "Downloading FFmpeg (first run only, about 110 MB)…";
             var ffmpegPath = await _ffmpeg.EnsureAsync(
                 new Progress<double>(p => Progress = p * 0.1), token);
 

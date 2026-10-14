@@ -239,6 +239,30 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task Download_WhenFfmpegMissing_ShowsFirstRunStatus()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.IsAvailable).Returns(false);
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+
+        var vm = CreateSut();
+        string? statusDuringEnsure = null;
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .Callback(() => statusDuringEnsure = vm.StatusMessage)
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedQuality = Mp3Quality.Cbr256;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.NotNull(statusDuringEnsure);
+        Assert.Contains("first run", statusDuringEnsure);
+    }
+
+    [Fact]
     public void Constructor_LoadsExistingHistory()
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
