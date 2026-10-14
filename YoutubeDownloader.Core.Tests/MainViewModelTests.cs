@@ -33,7 +33,9 @@ public class MainViewModelTests
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
             _confirm.Object, _foobar.Object);
 
-    private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true) => new(
+    private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true,
+        string sourceUrl = "https://youtu.be/dQw4w9WgXcQ") => new(
+        SourceUrl: sourceUrl,
         Title: "Test Video",
         Author: "Tester",
         Duration: TimeSpan.FromMinutes(3),

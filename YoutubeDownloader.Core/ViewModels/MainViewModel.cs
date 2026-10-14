@@ -258,6 +258,7 @@ public partial class MainViewModel : ObservableObject
         var info = VideoInfo!;
         var mode = SelectedMode;
         var quality = SelectedQuality;
+        var selectedVideoQuality = SelectedVideoQuality;
 
         if (mode == DownloadMode.AudioOpus && info.BestOpusAudio is null)
         {
@@ -323,7 +324,7 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
-                var videoQuality = SelectedVideoQuality ?? info.VideoOptions.First();
+                var videoQuality = selectedVideoQuality ?? info.VideoOptions.First();
                 formatLabel = $"MP4 · {videoQuality.QualityLabel}";
                 StatusMessage = $"Downloading video ({videoQuality.QualityLabel})…";
                 var tempVideo = _temp.NewTempFile(videoQuality.Container);
@@ -343,7 +344,7 @@ public partial class MainViewModel : ObservableObject
 
             Progress = 1.0;
             StatusMessage = $"Done! Saved to {target}";
-            RecordHistory(info.Title, formatLabel, target);
+            RecordHistory(info.SourceUrl, info.Title, formatLabel, target);
         }
         catch (OperationCanceledException)
         {
@@ -389,11 +390,11 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RecordHistory(string title, string format, string filePath)
+    private void RecordHistory(string url, string title, string format, string filePath)
     {
         History.Insert(0, new HistoryEntry
         {
-            Url = Url,
+            Url = url,
             Title = title,
             Format = format,
             FilePath = filePath,
