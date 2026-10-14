@@ -2,7 +2,12 @@
 setlocal
 cd /d "%~dp0"
 
-set VERSION=1.4.0
+set "VERSION="
+for /f "delims=" %%v in ('dotnet msbuild "YoutubeDownloader.Avalonia\YoutubeDownloader.Avalonia.csproj" -getProperty:Version') do set "VERSION=%%v"
+if not defined VERSION (
+  echo ERROR: could not read ^<Version^> from YoutubeDownloader.Avalonia.csproj
+  exit /b 1
+)
 echo Publishing + zipping Liudochka Youtube Downloader (Avalonia) v%VERSION% ...
 echo.
 

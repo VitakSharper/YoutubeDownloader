@@ -15,7 +15,7 @@ Run from the repo root (`C:\Repos\YoutubeDownloader`):
 .\release.cmd
 ```
 
-`release.cmd` runs, in effect, this single-line publish (bump `set VERSION=` in the script + `<Version>` in the csproj first):
+`release.cmd` runs, in effect, this single-line publish (bump `<Version>` in the csproj first — the script reads the version from it):
 
 ```
 dotnet publish YoutubeDownloader.Avalonia/YoutubeDownloader.Avalonia.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:DebugSymbols=false -o dist

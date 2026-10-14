@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore YoutubeDownloader.sln
+
+      - name: Build
+        run: dotnet build YoutubeDownloader.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test YoutubeDownloader.sln -c Release --no-build
