@@ -14,6 +14,8 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Xabe.FFmpeg.Downloader" Version="6.0.2" />
     <PackageReference Include="YoutubeExplode" Version="6.6.2" />
+    <!-- Xabe.FFmpeg(.Downloader) 6.x is built against System.Text.Json 9 but doesn't declare it; net8's in-box STJ is 8.0. -->
+    <PackageReference Include="System.Text.Json" Version="9.0.21" />
   </ItemGroup>
 
 </Project>
