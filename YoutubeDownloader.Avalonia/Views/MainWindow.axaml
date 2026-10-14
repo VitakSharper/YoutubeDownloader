@@ -75,7 +75,7 @@
 
             <Grid ColumnDefinitions="*,Auto">
               <TextBox Grid.Column="0" Classes="glass" Margin="0,0,10,0"
-                       Watermark="Paste a YouTube URL…"
+                       PlaceholderText="Paste a YouTube URL…"
                        Text="{Binding Url}" IsEnabled="{Binding !IsBusy}" />
               <Button Grid.Column="1" Classes="accent" Content="Fetch"
                       Command="{Binding FetchInfoCommand}" />
@@ -161,7 +161,7 @@
           <!-- Search + clear -->
           <Grid Grid.Row="0" Margin="0,0,0,12" ColumnDefinitions="*,Auto">
             <TextBox Grid.Column="0" Classes="glass" Margin="0,0,10,0"
-                     Watermark="Search by title or link…" Text="{Binding SearchText}" />
+                     PlaceholderText="Search by title or link…" Text="{Binding SearchText}" />
             <Button Grid.Column="1" Classes="chip" Content="Clear all" VerticalAlignment="Center"
                     Command="{Binding ClearHistoryCommand}" />
           </Grid>
