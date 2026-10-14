@@ -1,8 +1,8 @@
 # 🎀 Liudochka Youtube Downloader
 
-A small, friendly Windows desktop app for grabbing **audio and video from any YouTube link** — pick a format, pick a quality, and download. Built on .NET 8 with a frosted-glass cassette theme. Ships as an **Avalonia** app with in-app updates.
+A small, friendly Windows desktop app for grabbing **audio and video from any YouTube link** — pick a format, pick a quality, and download. Built on .NET 10 with a frosted-glass cassette theme. Ships as an **Avalonia** app with in-app updates.
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![UI](https://img.shields.io/badge/UI-Avalonia-2C3E50)
 
@@ -30,7 +30,7 @@ A small, friendly Windows desktop app for grabbing **audio and video from any Yo
 ## Requirements
 
 - **Windows** — the Avalonia build ships as a Windows x64 single file.
-- **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** — only needed to build/run from source. A published release is self-contained and needs no .NET install.
+- **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)** — only needed to build/run from source. A published release is self-contained and needs no .NET install.
 
 ## Getting started (from source)
 
@@ -84,11 +84,11 @@ Deleting that folder resets the app to a clean state.
 
 ```
 YoutubeDownloader.sln
-├─ YoutubeDownloader.Core/        Platform-agnostic logic (net8.0)
+├─ YoutubeDownloader.Core/        Platform-agnostic logic (net10.0)
 │  ├─ Services/                   YouTube access, FFmpeg, history, settings, updates, …
 │  ├─ ViewModels/                 MVVM view models (CommunityToolkit.Mvvm)
 │  ├─ Models/ · Helpers/ · Ffmpeg/
-├─ YoutubeDownloader.Avalonia/    Avalonia UI (net8.0) — in-app updates
+├─ YoutubeDownloader.Avalonia/    Avalonia UI (net10.0) — in-app updates
 ├─ YoutubeDownloader.Core.Tests/  Unit tests (xUnit + Moq)
 └─ release.cmd                    Single-file release build
 ```
