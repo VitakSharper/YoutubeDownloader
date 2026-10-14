@@ -152,6 +152,18 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
+    /// <summary>Drop the loaded video when the URL box now points at a different video.</summary>
+    partial void OnUrlChanged(string value)
+    {
+        if (VideoInfo is null)
+            return;
+        if (YouTubeUrlValidator.GetVideoId(value) == YouTubeUrlValidator.GetVideoId(VideoInfo.SourceUrl))
+            return; // same video, e.g. a timestamp or a different URL form
+        VideoInfo = null;
+        SelectedVideoQuality = null;
+        StatusMessage = "Press Fetch to load this link.";
+    }
+
     public IReadOnlyList<Mp3Quality> Qualities { get; } = Mp3Quality.All;
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
 
