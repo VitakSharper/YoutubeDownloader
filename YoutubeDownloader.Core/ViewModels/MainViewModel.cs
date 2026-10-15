@@ -48,6 +48,8 @@ public partial class MainViewModel : ObservableObject
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
+        _selectedMode = ModeFromSetting(_appSettings.LastMode);
+        _selectedQuality = Mp3Quality.FromKey(_appSettings.LastMp3Quality);
 
         foreach (var entry in _history.Load())
             History.Add(entry);
@@ -145,6 +147,26 @@ public partial class MainViewModel : ObservableObject
         _appSettings.AlwaysOnTop = value;
         TrySaveSettings();
     }
+
+    partial void OnSelectedModeChanged(DownloadMode value)
+    {
+        _appSettings.LastMode = value.ToString();
+        TrySaveSettings();
+    }
+
+    partial void OnSelectedQualityChanged(Mp3Quality value)
+    {
+        // A ComboBox can transiently push null through the two-way binding; never persist that.
+        if (value is null)
+            return;
+        _appSettings.LastMp3Quality = value.Key;
+        TrySaveSettings();
+    }
+
+    private static DownloadMode ModeFromSetting(string? value)
+        => Enum.TryParse<DownloadMode>(value, ignoreCase: true, out var mode) && Enum.IsDefined(mode)
+            ? mode
+            : DownloadMode.AudioMp3;
 
     /// <summary>A YouTube link detected on the clipboard, surfaced as a suggestion. Null hides the banner.</summary>
     [ObservableProperty]
