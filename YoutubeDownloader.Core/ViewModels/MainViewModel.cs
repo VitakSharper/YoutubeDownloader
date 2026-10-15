@@ -57,7 +57,11 @@ public partial class MainViewModel : ObservableObject
         foreach (var entry in _history.Load())
             History.Add(entry);
 
-        History.CollectionChanged += (_, _) => RebuildHistoryGroups();
+        History.CollectionChanged += (_, _) =>
+        {
+            if (!_deferHistoryGroups)   // a playlist run regroups once per batch (RecordQueueHistory)
+                RebuildHistoryGroups();
+        };
         RebuildHistoryGroups();
     }
 
@@ -523,10 +527,16 @@ public partial class MainViewModel : ObservableObject
             FilePath = filePath,
             DownloadedAt = DateTimeOffset.Now
         });
-        while (History.Count > MaxHistory)
-            History.RemoveAt(History.Count - 1);
+        TrimHistory();
         if (TrySaveHistory() is { } error)
             StatusMessage = $"Done! Saved to {filePath} — but history couldn't be saved: {error}";
+    }
+
+    /// <summary>Drops the oldest entries beyond <see cref="MaxHistory"/>.</summary>
+    private void TrimHistory()
+    {
+        while (History.Count > MaxHistory)
+            History.RemoveAt(History.Count - 1);
     }
 
     /// <summary>Re-load a past link into the URL box, switch to the Download tab, and fetch it.</summary>
