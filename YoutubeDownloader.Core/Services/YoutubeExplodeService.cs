@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using YoutubeExplode;
 using YoutubeExplode.Common;
 using YoutubeExplode.Videos.Streams;
@@ -53,4 +54,21 @@ public sealed class YoutubeExplodeService : IYouTubeService
 
     public async Task DownloadStreamAsync(IStreamInfo stream, string filePath, IProgress<double>? progress, CancellationToken ct)
         => await _client.Videos.Streams.DownloadAsync(stream, filePath, progress, ct);
+
+    public async Task<PlaylistInfo> GetPlaylistAsync(string listId, CancellationToken ct)
+        => PlaylistMapping.ToPlaylistInfo(await _client.Playlists.GetAsync(listId, ct), ThumbnailMinWidth);
+
+    public async IAsyncEnumerable<IReadOnlyList<QueueItem>> GetPlaylistItemBatchesAsync(string listId,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var index = 0;
+        await foreach (var batch in _client.Playlists.GetVideoBatchesAsync(listId, ct))
+        {
+            var items = new List<QueueItem>(batch.Items.Count);
+            foreach (var video in batch.Items)
+                items.Add(PlaylistMapping.ToQueueItem(video, ++index, ThumbnailMinWidth));
+            if (items.Count > 0)
+                yield return items;
+        }
+    }
 }
