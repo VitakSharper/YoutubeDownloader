@@ -72,7 +72,10 @@ public static class FFmpegArguments
             ("title", tags.Title),
             ("artist", tags.Artist),
             ("comment", tags.SourceUrl),
-            ("date", tags.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            ("date", tags.Year?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            // After date, so files without album tags keep byte-identical arguments (plan 027a).
+            ("album", tags.Album),
+            ("track", TrackText(tags))
         ];
 
         foreach (var (key, value) in pairs)
@@ -83,4 +86,10 @@ public static class FFmpegArguments
             yield return $"{key}={value}";
         }
     }
+
+    /// <summary>"3/12" with the album's track count (the ID3 TRCK convention), "3" without it, null without a track.</summary>
+    private static string? TrackText(MediaTags tags) =>
+        tags.Track is not { } track ? null
+        : tags.TrackCount is { } count ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{track}/{count}")
+        : track.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
