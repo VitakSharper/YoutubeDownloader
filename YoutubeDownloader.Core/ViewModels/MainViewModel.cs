@@ -11,7 +11,7 @@ namespace YoutubeDownloader.Core.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private const int MaxHistory = 100;
+    private const int MaxHistory = 1000;   // maintainer answer 4 (018 §8): one ordinary playlist no longer evicts everything
 
     private readonly IYouTubeService _youtube;
     private readonly IFFmpegLocator _ffmpeg;

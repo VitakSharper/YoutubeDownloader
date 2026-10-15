@@ -112,7 +112,7 @@ public static class OutputFileNamer
         if (string.IsNullOrEmpty(entry.FilePath))
             return null;
 
-        var videoId = YouTubeUrlValidator.GetVideoId(entry.Url);
+        var videoId = entry.VideoId ?? YouTubeUrlValidator.GetVideoId(entry.Url);   // older entries carry the id in their URL only
         var savedFolder = Path.TrimEndingDirectorySeparator(Path.GetDirectoryName(entry.FilePath) ?? "");
         var inFolder = string.Equals(savedFolder, folder, StringComparison.OrdinalIgnoreCase);
         var sameExtension = string.Equals(Path.GetExtension(entry.FilePath), dotExtension, StringComparison.OrdinalIgnoreCase);
