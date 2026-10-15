@@ -10,12 +10,14 @@ public partial class UpdateViewModel : ObservableObject
 {
     private readonly IUpdateService _updates;
     private readonly IFileRevealer _revealer;
+    private readonly ISelfUpdater _selfUpdater;
     private UpdateInfo? _latest;
 
-    public UpdateViewModel(IUpdateService updates, IFileRevealer revealer)
+    public UpdateViewModel(IUpdateService updates, IFileRevealer revealer, ISelfUpdater selfUpdater)
     {
         _updates = updates;
         _revealer = revealer;
+        _selfUpdater = selfUpdater;
     }
 
     [ObservableProperty] private string _status = "";
@@ -108,6 +110,9 @@ public partial class UpdateViewModel : ObservableObject
         {
             var progress = new Progress<double>(p => Progress = p);
             var exe = await _updates.DownloadAndExtractAsync(_latest, progress);
+            if (TryInstallAndRestart(exe))
+                return;
+
             _revealer.RevealInFolder(exe);
             Status = "Downloaded. Close the app, then replace the old .exe with the new one.";
         }
@@ -119,6 +124,27 @@ public partial class UpdateViewModel : ObservableObject
         {
             IsDownloadingUpdate = false;
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Replaces the running exe with <paramref name="exe"/> and restarts, when this build can.
+    /// False (manual flow) when it is not an exe, the build is not eligible, or the install fails.
+    /// </summary>
+    private bool TryInstallAndRestart(string exe)
+    {
+        if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !_selfUpdater.CanSelfUpdate)
+            return false;
+
+        Status = "Installing update…";
+        try
+        {
+            _selfUpdater.ApplyAndRestart(exe);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false; // e.g. the previous update's .old is still locked: nothing changed, fall back
         }
     }
 

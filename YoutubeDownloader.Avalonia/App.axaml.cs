@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using YoutubeDownloader.Avalonia.Services;
 using YoutubeDownloader.Avalonia.Views;
+using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
 using YoutubeDownloader.Core.ViewModels;
@@ -22,6 +23,10 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // Read once, before a self-update can rename the running exe (the value is undefined after a rename).
+        var processPath = Environment.ProcessPath;
+        ExeSwapper.CleanupOld(processPath); // remove the previous version left by an in-place update, if it is no longer running
+
         var baseDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "YoutubeDownloader");
@@ -69,6 +74,7 @@ public partial class App : Application
         var updateHttp = new HttpClient();
         services.AddSingleton<IUpdateService>(_ =>
             new GitHubUpdateService(updateHttp, new UpdateOptions("VitakSharper", "YoutubeDownloader", currentVersion)));
+        services.AddSingleton<ISelfUpdater>(_ => new SelfUpdater(processPath));
         services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();

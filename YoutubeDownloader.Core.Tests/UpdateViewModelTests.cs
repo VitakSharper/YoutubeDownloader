@@ -11,11 +11,22 @@ public class UpdateViewModelTests
     private static UpdateInfo Available =>
         new(new Version(1, 0, 0), new Version(1, 1, 0), true, "https://x/app.zip", "app.zip", "https://x/rel", "notes");
 
-    private static (UpdateViewModel vm, Mock<IUpdateService> svc, Mock<IFileRevealer> rev) Make()
+    private const string DownloadedExe = @"C:\Downloads\Liudochka-1.1.0\app.exe";
+
+    // The default self-updater is a loose mock: CanSelfUpdate == false, so the manual flow applies.
+    private static (UpdateViewModel vm, Mock<IUpdateService> svc, Mock<IFileRevealer> rev) Make(Mock<ISelfUpdater>? self = null)
     {
         var svc = new Mock<IUpdateService>();
         var rev = new Mock<IFileRevealer>();
-        return (new UpdateViewModel(svc.Object, rev.Object), svc, rev);
+        self ??= new Mock<ISelfUpdater>();
+        return (new UpdateViewModel(svc.Object, rev.Object, self.Object), svc, rev);
+    }
+
+    private static void SetupDownload(Mock<IUpdateService> svc)
+    {
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Available);
+        svc.Setup(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(DownloadedExe);
     }
 
     [Fact]
@@ -265,5 +276,57 @@ public class UpdateViewModelTests
 
         Assert.Contains("rate-limited", vm.Status, StringComparison.OrdinalIgnoreCase);
         Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task Download_when_eligible_installs_and_restarts()
+    {
+        var self = new Mock<ISelfUpdater>();
+        self.SetupGet(s => s.CanSelfUpdate).Returns(true);
+        var (vm, svc, rev) = Make(self);
+        SetupDownload(svc);
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        self.Verify(s => s.ApplyAndRestart(DownloadedExe), Times.Once);
+        rev.Verify(r => r.RevealInFolder(It.IsAny<string>()), Times.Never);
+        Assert.Equal("Installing update…", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task Download_when_not_eligible_reveals_exe()
+    {
+        var self = new Mock<ISelfUpdater>();
+        self.SetupGet(s => s.CanSelfUpdate).Returns(false);
+        var (vm, svc, rev) = Make(self);
+        SetupDownload(svc);
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        self.Verify(s => s.ApplyAndRestart(It.IsAny<string>()), Times.Never);
+        rev.Verify(r => r.RevealInFolder(DownloadedExe), Times.Once);
+        Assert.Contains("replace", vm.Status, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Download_when_install_fails_falls_back_to_reveal()
+    {
+        var self = new Mock<ISelfUpdater>();
+        self.SetupGet(s => s.CanSelfUpdate).Returns(true);
+        self.Setup(s => s.ApplyAndRestart(It.IsAny<string>()))
+            .Throws(new UnauthorizedAccessException("the previous .old is still in use"));
+        var (vm, svc, rev) = Make(self);
+        SetupDownload(svc);
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        rev.Verify(r => r.RevealInFolder(DownloadedExe), Times.Once);
+        Assert.Contains("replace", vm.Status, StringComparison.OrdinalIgnoreCase);
+        Assert.False(vm.IsBusy);
+        Assert.False(vm.IsDownloadingUpdate);
     }
 }
