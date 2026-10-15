@@ -18,7 +18,8 @@ public sealed class YoutubeExplodeService : IYouTubeService
         var manifest = await _client.Videos.Streams.GetManifestAsync(video.Id, ct);
 
         var audioOptions = manifest.GetAudioOnlyStreams()
-            .Select(a => StreamMapping.ToAudioOption(a.AudioCodec, a.Bitrate.BitsPerSecond, a.Container.Name, a))
+            // IsAudioLanguageDefault is null when the manifest has no language data, false on a dubbed track.
+            .Select(a => StreamMapping.ToAudioOption(a.AudioCodec, a.Bitrate.BitsPerSecond, a.Container.Name, a, a.IsAudioLanguageDefault))
             .ToList();
 
         if (audioOptions.Count == 0)
