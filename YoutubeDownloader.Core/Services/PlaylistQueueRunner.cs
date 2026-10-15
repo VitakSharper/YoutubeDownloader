@@ -199,7 +199,7 @@ public sealed class PlaylistQueueRunner
         DownloadOutcome outcome;
         try
         {
-            var request = new DownloadRequest(info, output, entry.TargetPath, QueueTags.For(item, info), job.FfmpegPath);
+            var request = new DownloadRequest(info, output, entry.TargetPath, QueueTags.For(item, info, job.Album), job.FfmpegPath);
             outcome = await _pipeline.RunAsync(request, progress, cts.Token);
         }
         finally

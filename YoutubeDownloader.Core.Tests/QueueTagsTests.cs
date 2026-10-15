@@ -31,7 +31,7 @@ public class QueueTagsTests
     {
         var tags = QueueTags.For(Item, Info(new DateTimeOffset(2009, 10, 25, 0, 0, 0, TimeSpan.Zero)));
 
-        Assert.Equal(new MediaTags("Artist - Song", "Artist - Topic", WatchUrl, 2009), tags);
+        Assert.Equal(new MediaTags("Artist - Song", "Artist", WatchUrl, 2009), tags);
     }
 
     [Fact]
@@ -40,5 +40,35 @@ public class QueueTagsTests
         var tags = QueueTags.For(Item, Info(uploadDate: null));
 
         Assert.Null(tags.Year);
+    }
+
+    [Fact]
+    public void For_WithAlbum_SetsAlbumTrackAndTotal()
+    {
+        var tags = QueueTags.For(Item with { Index = 7 }, Info(uploadDate: null), new AlbumTagging("Pharmacology", 50));
+
+        Assert.Equal("Pharmacology", tags.Album);
+        Assert.Equal(7, tags.Track);   // the item's playlist index
+        Assert.Equal(50, tags.TrackCount);
+    }
+
+    [Fact]
+    public void For_WithoutAlbum_LeavesAlbumAndTrackEmpty()
+    {
+        var tags = QueueTags.For(Item with { Index = 7 }, Info(uploadDate: null));
+
+        Assert.Null(tags.Album);
+        Assert.Null(tags.Track);
+        Assert.Null(tags.TrackCount);
+    }
+
+    [Theory]
+    [InlineData("Eminem - Topic", "Eminem")]
+    [InlineData("BeyoncéVEVO", "Beyoncé")]
+    public void For_ArtistDropsTopicOrVevo(string channel, string artist)
+    {
+        var tags = QueueTags.For(Item, Info(uploadDate: null) with { Author = channel });
+
+        Assert.Equal(artist, tags.Artist);
     }
 }
