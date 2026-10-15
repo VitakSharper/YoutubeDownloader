@@ -17,10 +17,19 @@ public sealed partial class QueueItemViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusToolTip))]
     [NotifyPropertyChangedFor(nameof(Progress))]
     [NotifyPropertyChangedFor(nameof(IsDownloading))]
     [NotifyPropertyChangedFor(nameof(IsFailed))]
+    [NotifyPropertyChangedFor(nameof(CanRemove))]
     private ItemState _state = new ItemState.Pending();
+
+    /// <summary>True while this row belongs to the running queue (shows ✕).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRemove))]
+    private bool _isQueued;
+
+    public bool CanRemove => IsQueued && !State.IsFinal;
 
     /// <summary>"001": the same number the file name gets (plan 023).</summary>
     public string NumberText => Item.Index.ToString("D3", CultureInfo.InvariantCulture);
@@ -31,6 +40,9 @@ public sealed partial class QueueItemViewModel : ObservableObject
         : "24 h +";
 
     public string StatusText => ItemStateText.For(State);
+
+    /// <summary>A failure reason in full: the status column has a fixed width and ellipsizes long ones.</summary>
+    public string? StatusToolTip => State is ItemState.Failed failed ? failed.Reason : null;
     public double Progress => State is ItemState.Downloading downloading ? downloading.Progress : 0;
     public bool IsDownloading => State is ItemState.Downloading;
     public bool IsFailed => State is ItemState.Failed;

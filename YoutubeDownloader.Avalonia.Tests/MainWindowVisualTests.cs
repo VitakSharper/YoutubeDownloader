@@ -36,6 +36,7 @@ public class MainWindowVisualTests
     private readonly Mock<IUpdateService> _updates = new();
     private readonly Mock<ISelfUpdater> _selfUpdater = new();
     private readonly Mock<IClipboardService> _clipboard = new();
+    private readonly Mock<IFolderPickerService> _folderPicker = new();
 
     public MainWindowVisualTests()
     {
@@ -287,7 +288,7 @@ public class MainWindowVisualTests
         var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object,
             new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, Mock.Of<IOutputFileService>(), Mock.Of<IThumbnailFetcher>()),
             _saveFile.Object, _history.Object, Mock.Of<ILinkOpener>(), Mock.Of<IFileRevealer>(), _settings.Object,
-            _clipboard.Object, _confirm.Object, Mock.Of<IFoobar2000Launcher>());
+            _clipboard.Object, _confirm.Object, Mock.Of<IFoobar2000Launcher>(), _folderPicker.Object, Mock.Of<IRetryDelay>());
         var update = new UpdateViewModel(_updates.Object, Mock.Of<IFileRevealer>(), _selfUpdater.Object);
         var window = new MainWindow(vm, new AvaloniaClipboardService(), update);
         window.Show(); // raises Opened → the silent startup update check

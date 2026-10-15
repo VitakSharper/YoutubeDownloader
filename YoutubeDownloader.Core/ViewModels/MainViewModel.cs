@@ -24,12 +24,15 @@ public partial class MainViewModel : ObservableObject
     private readonly IClipboardService _clipboard;
     private readonly IConfirmationService _confirm;
     private readonly IFoobar2000Launcher _foobar;
+    private readonly IFolderPickerService _folderPicker;
+    private readonly IRetryDelay _retryDelay;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IDownloadPipeline pipeline,
         ISaveFileService saveFile, IHistoryStore history, ILinkOpener linkOpener,
         IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
-        IConfirmationService confirm, IFoobar2000Launcher foobar)
+        IConfirmationService confirm, IFoobar2000Launcher foobar, IFolderPickerService folderPicker,
+        IRetryDelay retryDelay)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -42,8 +45,11 @@ public partial class MainViewModel : ObservableObject
         _clipboard = clipboard;
         _confirm = confirm;
         _foobar = foobar;
+        _folderPicker = folderPicker;
+        _retryDelay = retryDelay;
 
         _appSettings = _settings.Load();
+        _playlistFolder = _appSettings.LastSaveFolder;
         _alwaysOnTop = _appSettings.AlwaysOnTop;
         _selectedMode = ModeFromSetting(_appSettings.LastMode);
         _selectedQuality = Mp3Quality.FromKey(_appSettings.LastMp3Quality);
@@ -100,6 +106,11 @@ public partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(UseEntryCommand))]
     [NotifyCanExecuteChangedFor(nameof(ChooseThisVideoCommand))]
     [NotifyCanExecuteChangedFor(nameof(ChooseWholePlaylistCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DownloadPlaylistCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RetryFailedCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ChangePlaylistFolderCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowPlaylistDownload))]
+    [NotifyPropertyChangedFor(nameof(ShowRetryFailed))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -189,12 +200,14 @@ public partial class MainViewModel : ObservableObject
     partial void OnUrlChanged(string value)
     {
         var link = YouTubeLink.Parse(value);
-        PlaylistChoice = LinkAction.For(link) as LinkAction.OfferChoice;   // the banner follows the box, offline
         if (Playlist is not null && !IsSameList(link, Playlist.ListId))
         {
             Playlist = null;
             StatusMessage = "Press Fetch to load this link.";
         }
+
+        // The banner follows the box, offline. A card still open here is for this same list: the choice is made.
+        PlaylistChoice = Playlist is null ? LinkAction.For(link) as LinkAction.OfferChoice : null;
 
         if (VideoInfo is null)
             return;
@@ -453,9 +466,11 @@ public partial class MainViewModel : ObservableObject
     private static MediaTags BuildTags(VideoInfo info)
         => new(info.Title, info.Author, info.SourceUrl, info.UploadDate is { Year: > 1900 } d ? d.Year : null);
 
-    private void RememberSaveFolder(string target)
+    private void RememberSaveFolder(string target) => RememberFolder(Path.GetDirectoryName(target));
+
+    /// <summary>Makes <paramref name="folder"/> the next save dialog's and folder picker's starting point.</summary>
+    private void RememberFolder(string? folder)
     {
-        var folder = Path.GetDirectoryName(target);
         if (!string.IsNullOrEmpty(folder) && folder != _appSettings.LastSaveFolder)
         {
             _appSettings.LastSaveFolder = folder;

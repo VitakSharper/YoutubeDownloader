@@ -30,6 +30,9 @@ public class MainViewModelPlaylistTests
     private readonly Mock<IFoobar2000Launcher> _foobar = new();
     private readonly Mock<IOutputFileService> _output = new();
     private readonly Mock<IThumbnailFetcher> _thumbnails = new();
+    private readonly Mock<IFolderPickerService> _folderPicker = new();
+    private readonly Mock<IRetryDelay> _retryDelay = Mock.Get(Mock.Of<IRetryDelay>(d =>
+        d.WaitAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()) == Task.CompletedTask));
 
     public MainViewModelPlaylistTests()
     {
@@ -42,7 +45,7 @@ public class MainViewModelPlaylistTests
         new(_youtube.Object, _ffmpeg.Object,
             new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, _output.Object, _thumbnails.Object),
             _saveFile.Object, _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object,
-            _clipboard.Object, _confirm.Object, _foobar.Object);
+            _clipboard.Object, _confirm.Object, _foobar.Object, _folderPicker.Object, _retryDelay.Object);
 
     private static VideoInfo SampleInfo(string sourceUrl) => new(
         SourceUrl: sourceUrl,
