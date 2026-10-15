@@ -133,6 +133,7 @@ public partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(UpscaleWarning))]
     [NotifyPropertyChangedFor(nameof(ShowQuality))]
     [NotifyPropertyChangedFor(nameof(ShowVideoQuality))]
+    [NotifyPropertyChangedFor(nameof(ShowAlbumTagging))]
     private DownloadMode _selectedMode = DownloadMode.AudioMp3;
 
     [ObservableProperty]

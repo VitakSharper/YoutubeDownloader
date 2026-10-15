@@ -25,6 +25,7 @@ public partial class MainViewModel
     [NotifyPropertyChangedFor(nameof(ShowRetryFailed))]
     [NotifyPropertyChangedFor(nameof(DownloadPlaylistLabel))]
     [NotifyPropertyChangedFor(nameof(PlaylistTargetFolder))]
+    [NotifyPropertyChangedFor(nameof(ShowAlbumTagging))]
     [NotifyCanExecuteChangedFor(nameof(DownloadPlaylistCommand))]
     private PlaylistViewModel? _playlist;
 
@@ -81,6 +82,9 @@ public partial class MainViewModel
         string.IsNullOrEmpty(PlaylistFolder) ? "Chosen when you start"
         : UseSubFolder && Playlist is not null ? OutputFileNamer.SubFolder(PlaylistFolder, Playlist.Title)
         : PlaylistFolder;
+
+    /// <summary>The "Tag as an album" checkbox: playlist mode in an audio format (MP4 files get no tags).</summary>
+    public bool ShowAlbumTagging => IsPlaylistMode && SelectedMode != DownloadMode.Video;
 
     private CancellationTokenSource? _queueCts;
     private PlaylistQueueRunner? _queueRunner;
@@ -303,7 +307,9 @@ public partial class MainViewModel
             Directory.CreateDirectory(folder);
             StatusMessage = "Fetching video info…";
 
-            var job = new QueueJob(toRun.Select((row, i) => new QueueJobItem(row.Item, targets[i])).ToList(), format, ffmpegPath);
+            // Track = playlist index, total = items listed (not PlaylistInfo.Count, which can include hidden videos).
+            var album = playlist.TagAsAlbum ? new AlbumTagging(playlist.Title, playlist.Items.Count) : null;
+            var job = new QueueJob(toRun.Select((row, i) => new QueueJobItem(row.Item, targets[i])).ToList(), format, ffmpegPath, album);
             _queueRunner = new PlaylistQueueRunner(_youtube, _pipeline, _retryDelay);
             var stop = await _queueRunner.RunAsync(job, new InlineProgress<QueueEvent>(OnQueueEvent), token);
             StatusMessage = StopText(stop) + QueueSummary.From(rows.Select(r => r.State).ToList()).Describe();

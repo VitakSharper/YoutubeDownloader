@@ -425,6 +425,39 @@ public class MainWindowVisualTests
     }
 
     [AvaloniaFact]
+    public async Task PlaylistOptions_AlbumList_ShowsTagAsAlbumChecked()
+    {
+        const string albumUrl = "https://music.youtube.com/playlist?list=OLAK5uy_lLeonUugocG5J0EUAEDmbskX4emejKwcM";
+        var (window, vm, _) = Create();
+
+        await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), PharmacologyItems(), albumUrl);
+
+        Assert.Equal(ListKind.Album, vm.Playlist!.Kind);
+        Assert.Equal(DownloadMode.AudioMp3, vm.SelectedMode);
+        var box = window.GetVisualDescendants().OfType<CheckBox>().Single(c => Equals(c.Content, "Tag as an album"));
+        Assert.True(box.IsEffectivelyVisible);
+        Assert.True(box.IsChecked);
+        var texts = VisibleTexts(window);
+        Assert.Contains("Tag as an album", texts);
+        Assert.Single(texts, t => t == "MP3 QUALITY");
+        Assert.Equal("Writes the playlist title as the album and the position as the track number", ToolTip.GetTip(box));
+        // At 720×640 the box shares the format line with both combos, and the checklist keeps its 4 rows.
+        var formatLine = ((WrapPanel)box.Parent!).Children[0];
+        Assert.True(box.Bounds.Y < formatLine.Bounds.Bottom, $"The box wrapped to a new line (y = {box.Bounds.Y}).");
+        var checklist = Checklist(window);
+        Assert.True(checklist.Bounds.Height >= 112, $"The checklist is {checklist.Bounds.Height} px tall; 4 rows need 112 px.");
+        Snapshot(window, "027a-album-checkbox");
+
+        vm.SelectedMode = DownloadMode.Video;
+        Settle();
+
+        Assert.False(box.IsEffectivelyVisible);
+        Assert.DoesNotContain("Tag as an album", VisibleTexts(window));
+        Assert.Contains("MAX VIDEO HEIGHT", VisibleTexts(window));
+        Snapshot(window, "027a-album-checkbox-video");
+    }
+
+    [AvaloniaFact]
     public async Task LargeQueueRunning_HidesTheLongListWarning()
     {
         var folder = NewScratchFolder();
@@ -520,12 +553,12 @@ public class MainWindowVisualTests
         Settle();
     }
 
-    private async Task FetchPlaylistAsync(MainViewModel vm, PlaylistInfo info, IReadOnlyList<QueueItem> items)
+    private async Task FetchPlaylistAsync(MainViewModel vm, PlaylistInfo info, IReadOnlyList<QueueItem> items, string url = PlaylistUrl)
     {
         _youtube.Setup(y => y.GetPlaylistAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
         _youtube.Setup(y => y.GetPlaylistItemBatchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(() => Batches(items));
-        vm.Url = PlaylistUrl;
+        vm.Url = url;
         await vm.FetchInfoCommand.ExecuteAsync(null);
         Settle();
     }
