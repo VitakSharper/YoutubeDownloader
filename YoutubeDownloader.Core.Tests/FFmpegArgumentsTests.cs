@@ -40,7 +40,24 @@ public class FFmpegArgumentsTests
         Assert.Contains("-i \"C:\\a.m4a\"", args);
         Assert.Contains("-c:v copy", args);
         Assert.Contains("-c:a aac", args);
+        Assert.Contains("-b:a 192k", args);
         Assert.Contains("-movflags +faststart", args);
+        Assert.EndsWith("\"C:\\out.mp4\"", args);
+    }
+
+    [Fact]
+    public void ForMuxMp4CopyAudio_CopiesBothStreamsWithFaststart()
+    {
+        var args = FFmpegArguments.ForMuxMp4CopyAudio(@"C:\v.mp4", @"C:\a.mp4", @"C:\out.mp4");
+
+        Assert.StartsWith("-y", args);
+        Assert.Contains("-i \"C:\\v.mp4\"", args);
+        Assert.Contains("-i \"C:\\a.mp4\"", args);
+        Assert.Contains("-c:v copy", args);
+        Assert.Contains("-c:a copy", args);
+        Assert.Contains("-movflags +faststart", args);
+        Assert.DoesNotContain("-c:a aac", args);
+        Assert.DoesNotContain("-b:a", args);
         Assert.EndsWith("\"C:\\out.mp4\"", args);
     }
 
