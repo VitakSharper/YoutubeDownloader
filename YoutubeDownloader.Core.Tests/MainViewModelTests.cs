@@ -239,6 +239,51 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task Download_HistorySaveFails_KeepsEntryAndReportsDone()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+        _history.Setup(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>())).Throws(new IOException("disk full"));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Single(vm.History);
+        Assert.StartsWith("Done! Saved to", vm.StatusMessage);
+        Assert.Contains("disk full", vm.StatusMessage);
+        Assert.DoesNotContain("Download failed", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Download_SettingsSaveFails_StillDownloads()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
+        _settings.Setup(s => s.Save(It.IsAny<AppSettings>())).Throws(new IOException("read-only"));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(vm.History);
+    }
+
+    [Fact]
     public async Task Download_WhenFfmpegMissing_ShowsFirstRunStatus()
     {
         var info = SampleInfo();
@@ -442,6 +487,40 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void RemoveEntry_WhenSaveThrows_DoesNotThrowAndReportsStatus()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = "u1" }, new() { Url = "u2" },
+        });
+        _history.Setup(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>())).Throws(new IOException("locked"));
+        var vm = CreateSut();
+        var first = vm.History[0];
+
+        var ex = Record.Exception(() => vm.RemoveEntryCommand.Execute(first));
+
+        Assert.Null(ex);
+        Assert.Single(vm.History);
+        Assert.DoesNotContain(first, vm.History);
+        Assert.Contains("Couldn't save history", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task ClearHistory_WhenSaveThrows_DoesNotThrowAndReportsStatus()
+    {
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry> { new() { Url = "u1" } });
+        _history.Setup(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>())).Throws(new IOException("locked"));
+        _confirm.Setup(c => c.ConfirmAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var vm = CreateSut();
+
+        var ex = await Record.ExceptionAsync(() => vm.ClearHistoryCommand.ExecuteAsync(null));
+
+        Assert.Null(ex);
+        Assert.Empty(vm.History);
+        Assert.Contains("Couldn't save history", vm.StatusMessage);
+    }
+
+    [Fact]
     public async Task ClearHistory_WhenDeclined_KeepsHistory()
     {
         _history.Setup(h => h.Load()).Returns(new List<HistoryEntry> { new() { Url = "u1" } });
@@ -595,6 +674,18 @@ public class MainViewModelTests
         vm.AlwaysOnTop = false;
 
         _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.AlwaysOnTop == false)), Times.Once);
+    }
+
+    [Fact]
+    public void AlwaysOnTop_WhenSaveThrows_DoesNotThrowAndReportsStatus()
+    {
+        _settings.Setup(s => s.Save(It.IsAny<AppSettings>())).Throws(new IOException("read-only"));
+        var vm = CreateSut();
+
+        var ex = Record.Exception(() => vm.AlwaysOnTop = false);
+
+        Assert.Null(ex);
+        Assert.Contains("Couldn't save settings", vm.StatusMessage);
     }
 
     [Fact]

@@ -58,6 +58,47 @@ public class JsonHistoryStoreTests : IDisposable
         Assert.Empty(store.Load());
     }
 
+    [Fact]
+    public void Save_LeavesNoTmpFileBehind()
+    {
+        var store = new JsonHistoryStore(_dir);
+
+        store.Save(new[] { new HistoryEntry { Url = "a" } });
+
+        Assert.True(File.Exists(Path.Combine(_dir, "history.json")));
+        Assert.False(File.Exists(Path.Combine(_dir, "history.json.tmp")));
+    }
+
+    [Fact]
+    public void Load_WhenFileCorrupt_KeepsCorruptCopyAndReturnsEmpty()
+    {
+        const string invalid = "{ this is not valid json ]";
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "history.json"), invalid);
+
+        var store = new JsonHistoryStore(_dir);
+        Assert.Empty(store.Load());
+
+        var copy = Assert.Single(Directory.GetFiles(_dir, "history.json.corrupt-*"));
+        Assert.Equal(invalid, File.ReadAllText(copy));
+    }
+
+    [Fact]
+    public void Save_AfterCorruptLoad_DoesNotOverwriteCorruptCopy()
+    {
+        const string invalid = "{ this is not valid json ]";
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "history.json"), invalid);
+        var store = new JsonHistoryStore(_dir);
+        store.Load();
+
+        store.Save(new[] { new HistoryEntry { Url = "c" } });
+
+        var copy = Assert.Single(Directory.GetFiles(_dir, "history.json.corrupt-*"));
+        Assert.Equal(invalid, File.ReadAllText(copy));
+        Assert.Equal("c", Assert.Single(store.Load()).Url);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_dir))
