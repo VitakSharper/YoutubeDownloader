@@ -7,6 +7,8 @@ namespace YoutubeDownloader.Core.Services;
 
 public sealed class YoutubeExplodeService : IYouTubeService
 {
+    private const int ThumbnailMinWidth = 240; // 2× the 120 px thumbnail box in MainWindow.axaml — sharp up to 200% DPI
+
     private readonly YoutubeClient _client = new();
 
     public async Task<VideoInfo> GetVideoInfoAsync(string url, CancellationToken ct)
@@ -28,7 +30,9 @@ public sealed class YoutubeExplodeService : IYouTubeService
             manifest.GetVideoOnlyStreams()
                 .Select(v => StreamMapping.ToVideoOption(v.VideoQuality.Label, v.VideoQuality.MaxHeight, v.Container.Name, v)));
 
-        var thumb = video.Thumbnails.OrderByDescending(t => t.Resolution.Area).FirstOrDefault()?.Url ?? "";
+        var thumb = ThumbnailPicker.Pick(
+            video.Thumbnails.Select(t => (t.Url, t.Resolution.Width, t.Resolution.Height)),
+            ThumbnailMinWidth);
 
         return new VideoInfo(
             SourceUrl: url,
