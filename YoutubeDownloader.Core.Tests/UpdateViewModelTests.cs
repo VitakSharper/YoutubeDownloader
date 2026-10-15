@@ -178,4 +178,92 @@ public class UpdateViewModelTests
         tcs.SetResult(@"C:\Downloads\Liudochka-1.1.0\app.exe");
         await run;
     }
+
+    [Fact]
+    public async Task CheckSilently_available_sets_flag_and_status()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Available);
+
+        await vm.CheckSilentlyAsync();
+
+        Assert.True(vm.IsUpdateAvailable);
+        Assert.Equal("Version 1.1.0 is available (you have 1.0.0).", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckSilently_uptodate_leaves_status_empty()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new UpdateInfo(new Version(1, 1, 0), new Version(1, 1, 0), false, null, null, null, null));
+
+        await vm.CheckSilentlyAsync();
+
+        Assert.False(vm.IsUpdateAvailable);
+        Assert.Equal("", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckSilently_no_release_leaves_status_empty()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new UpdateInfo(new Version(1, 0, 0), null, false, null, null, null, null));
+
+        await vm.CheckSilentlyAsync();
+
+        Assert.False(vm.IsUpdateAvailable);
+        Assert.Equal("", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckSilently_network_error_is_silent()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
+           .ThrowsAsync(new HttpRequestException("x"));
+
+        var ex = await Record.ExceptionAsync(() => vm.CheckSilentlyAsync());
+
+        Assert.Null(ex);
+        Assert.False(vm.IsUpdateAvailable);
+        Assert.Equal("", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckSilently_while_busy_does_nothing()
+    {
+        var (vm, svc, _) = Make();
+        var tcs = new TaskCompletionSource<UpdateInfo>();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).Returns(tcs.Task);
+
+        var manual = vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        await vm.CheckSilentlyAsync();
+
+        svc.Verify(s => s.CheckAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(vm.IsBusy);
+
+        tcs.SetResult(Available);
+        await manual;
+
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task Check_too_many_requests_reports_rate_limited()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
+           .ThrowsAsync(new HttpRequestException("nope", null, HttpStatusCode.TooManyRequests));
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Contains("rate-limited", vm.Status, StringComparison.OrdinalIgnoreCase);
+        Assert.False(vm.IsBusy);
+    }
 }
