@@ -40,11 +40,8 @@ public partial class UpdateViewModel : ObservableObject
 
             if (info.LatestVersion is null)
                 Status = "No releases have been published yet.";
-            else if (info.IsUpdateAvailable && !string.IsNullOrEmpty(info.DownloadUrl))
-            {
-                IsUpdateAvailable = true;
-                Status = $"Version {info.LatestVersion} is available (you have {info.CurrentVersion}).";
-            }
+            else if (IsDownloadable(info))
+                ShowAvailable(info);
             else if (info.IsUpdateAvailable)
                 Status = $"Version {info.LatestVersion} is available, but the release has no downloadable file.";
             else
@@ -58,6 +55,43 @@ public partial class UpdateViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// One quiet check, run at startup: it only speaks up when a downloadable update exists.
+    /// Up to date, no release, no asset or any error leave <see cref="Status"/> untouched. Never throws.
+    /// </summary>
+    public async Task CheckSilentlyAsync()
+    {
+        if (IsBusy)
+            return;
+
+        IsBusy = true;
+        try
+        {
+            var info = await _updates.CheckAsync();
+            _latest = info;
+
+            if (IsDownloadable(info))
+                ShowAvailable(info);
+        }
+        catch (Exception)
+        {
+            // Silent by design: no error noise at startup. The manual check still reports errors.
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private static bool IsDownloadable(UpdateInfo info) =>
+        info.IsUpdateAvailable && !string.IsNullOrEmpty(info.DownloadUrl);
+
+    private void ShowAvailable(UpdateInfo info)
+    {
+        IsUpdateAvailable = true;
+        Status = $"Version {info.LatestVersion} is available (you have {info.CurrentVersion}).";
     }
 
     [RelayCommand]
@@ -90,7 +124,7 @@ public partial class UpdateViewModel : ObservableObject
 
     private static string FriendlyError(Exception ex) => ex switch
     {
-        HttpRequestException { StatusCode: HttpStatusCode.Forbidden } => "Update check is rate-limited — try again in a few minutes.",
+        HttpRequestException { StatusCode: HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests } => "Update check is rate-limited — try again in a few minutes.",
         HttpRequestException => "Couldn't reach GitHub. Check your connection.",
         _ => "Update failed — please try again.",
     };
