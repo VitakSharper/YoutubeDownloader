@@ -253,6 +253,10 @@
                   </ComboBox.ItemTemplate>
                 </ComboBox>
               </StackPanel>
+              <!-- Maintainer answer 8: on for YouTube Music albums, off elsewhere; hidden in Video mode (MP4 gets no tags). -->
+              <CheckBox Content="Tag as an album" IsChecked="{Binding Playlist.TagAsAlbum}" IsVisible="{Binding ShowAlbumTagging}"
+                        VerticalAlignment="Center" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}"
+                        ToolTip.Tip="Writes the playlist title as the album and the position as the track number" />
             </WrapPanel>
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
               <TextBlock Grid.Column="0" Classes="label" Text="SAVE TO" VerticalAlignment="Center" Margin="2,0,10,0" />

@@ -19,6 +19,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
     {
         ListId = listId;
         Kind = kind;
+        TagAsAlbum = kind == ListKind.Album;
     }
 
     public string ListId { get; }
@@ -72,6 +73,13 @@ public sealed partial class PlaylistViewModel : ObservableObject
     public string? LargeListWarning => Items.Count > LargeListThreshold && !HasStartedRun
         ? $"{Items.Count} videos: a list this long can take hours to download."
         : null;
+
+    /// <summary>
+    /// "Tag as an album": the playlist title as the album, the position as the track number. Maintainer answer 8:
+    /// on for YouTube Music albums (OLAK5uy_…), off for other lists. Not persisted.
+    /// </summary>
+    [ObservableProperty]
+    private bool _tagAsAlbum;
 
     /// <summary>Adds one page of items, each ticked. A video listed twice keeps its first row for <see cref="Find"/>.</summary>
     public void AddItems(IEnumerable<QueueItem> batch)

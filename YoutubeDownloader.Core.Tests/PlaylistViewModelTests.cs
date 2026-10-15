@@ -113,4 +113,14 @@ public class PlaylistViewModelTests
         Assert.Equal(expected, row.DurationText);
         Assert.Equal("001", row.NumberText);
     }
+
+    [Theory]
+    [InlineData(ListKind.Album, true)]
+    [InlineData(ListKind.Playlist, false)]
+    public void TagAsAlbum_IsOnOnlyForAlbums(ListKind kind, bool expected)
+    {
+        var playlist = new PlaylistViewModel(ListId, kind);
+
+        Assert.Equal(expected, playlist.TagAsAlbum);
+    }
 }

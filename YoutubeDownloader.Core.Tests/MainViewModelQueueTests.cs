@@ -319,6 +319,47 @@ public class MainViewModelQueueTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadPlaylist_TagAsAlbum_PassesAlbumAndTrackTags()
+    {
+        // A YouTube Music album (OLAK5uy_…): "Tag as an album" starts ticked.
+        const string albumId = "OLAK5uy_lLeonUugocG5J0EUAEDmbskX4emejKwcM";
+        _youtube.Setup(y => y.GetPlaylistAsync(albumId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PlaylistInfo(albumId, "Pharmacology", null, 3, null));
+        _youtube.Setup(y => y.GetPlaylistItemBatchesAsync(albumId, It.IsAny<CancellationToken>()))
+            .Returns(() => Batches(Enumerable.Range(1, 3).Select(Item).ToList()));
+        var album = CreateSut();
+        album.Url = "https://music.youtube.com/playlist?list=" + albumId;
+        await album.FetchInfoCommand.ExecuteAsync(null);
+        Assert.True(album.Playlist!.TagAsAlbum);
+        Assert.True(album.ShowAlbumTagging);
+
+        await album.DownloadPlaylistCommand.ExecuteAsync(null).WaitAsync(Guard);
+
+        Assert.Equal(3, Requests().Length);
+        Assert.All(Requests(), r =>
+        {
+            Assert.Equal("Pharmacology", r.Tags.Album);
+            Assert.Equal(IndexOf(r.Tags.SourceUrl), r.Tags.Track);   // the item's playlist index
+            Assert.Equal(3, r.Tags.TrackCount);
+        });
+
+        // An ordinary list: the box starts unticked, so no album tags.
+        _pipeline.Invocations.Clear();
+        var ordinary = await LoadedPlaylistAsync();
+        Assert.False(ordinary.Playlist!.TagAsAlbum);
+
+        await ordinary.DownloadPlaylistCommand.ExecuteAsync(null).WaitAsync(Guard);
+
+        Assert.Equal(3, Requests().Length);
+        Assert.All(Requests(), r =>
+        {
+            Assert.Null(r.Tags.Album);
+            Assert.Null(r.Tags.Track);
+            Assert.Null(r.Tags.TrackCount);
+        });
+    }
+
+    [Fact]
     public async Task CancelAll_Confirmed_CancelsTheRunAndMarksTheRestCancelled()
     {
         SetupGatedPipeline(1);
