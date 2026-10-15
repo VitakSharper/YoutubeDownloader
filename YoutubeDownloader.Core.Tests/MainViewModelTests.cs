@@ -689,6 +689,69 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void Constructor_RestoresLastModeAndQuality()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "Video", LastMp3Quality = "cbr-192" });
+
+        var vm = CreateSut();
+
+        Assert.Equal(DownloadMode.Video, vm.SelectedMode);
+        Assert.Same(Mp3Quality.Cbr192, vm.SelectedQuality);
+    }
+
+    [Fact]
+    public void Constructor_UnknownSavedValues_FallBackToDefaults()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "Flac", LastMp3Quality = "nope" });
+
+        var vm = CreateSut();
+
+        Assert.Equal(DownloadMode.AudioMp3, vm.SelectedMode);
+        Assert.Same(Mp3Quality.BestVbr, vm.SelectedQuality);
+    }
+
+    [Fact]
+    public void Constructor_WithSavedValues_DoesNotSave()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "AudioOpus", LastMp3Quality = "cbr-320" });
+
+        CreateSut();
+
+        _settings.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
+    public void SelectedMode_WhenChanged_PersistsName()
+    {
+        var vm = CreateSut();
+
+        vm.SelectedMode = DownloadMode.AudioOpus;
+
+        _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.LastMode == "AudioOpus")), Times.AtLeastOnce());
+    }
+
+    [Fact]
+    public void SelectedQuality_WhenChanged_PersistsKey()
+    {
+        var vm = CreateSut();
+
+        vm.SelectedQuality = Mp3Quality.Cbr256;
+
+        _settings.Verify(s => s.Save(It.Is<AppSettings>(a => a.LastMp3Quality == "cbr-256")), Times.AtLeastOnce());
+    }
+
+    [Fact]
+    public void SelectedQuality_SetToNull_DoesNotThrowOrSave()
+    {
+        var vm = CreateSut();
+
+        var ex = Record.Exception(() => vm.SelectedQuality = null!);
+
+        Assert.Null(ex);
+        _settings.Verify(s => s.Save(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Download_PassesRememberedFolderToSaveDialog()
     {
         _settings.Setup(s => s.Load()).Returns(new AppSettings { LastSaveFolder = @"C:\Music" });
