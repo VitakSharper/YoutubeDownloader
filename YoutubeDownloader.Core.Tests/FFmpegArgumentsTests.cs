@@ -9,12 +9,12 @@ public class FFmpegArgumentsTests
     {
         var args = FFmpegArguments.ForMp3Cbr(@"C:\in.webm", @"C:\out.mp3", 192);
 
-        Assert.Contains("-i \"C:\\in.webm\"", args);
+        AssertPair(args, "-i", @"C:\in.webm");
         Assert.Contains("-vn", args);
-        Assert.Contains("-c:a libmp3lame", args);
-        Assert.Contains("-b:a 192k", args);
-        Assert.Contains("\"C:\\out.mp3\"", args);
-        Assert.StartsWith("-y", args);
+        AssertPair(args, "-c:a", "libmp3lame");
+        AssertPair(args, "-b:a", "192k");
+        Assert.Equal(@"C:\out.mp3", args[^1]);
+        Assert.Equal("-y", args[0]);
     }
 
     [Fact]
@@ -22,13 +22,13 @@ public class FFmpegArgumentsTests
     {
         var args = FFmpegArguments.ForMp3Vbr(@"C:\in.webm", @"C:\out.mp3", 0);
 
-        Assert.Contains("-i \"C:\\in.webm\"", args);
+        AssertPair(args, "-i", @"C:\in.webm");
         Assert.Contains("-vn", args);
-        Assert.Contains("-c:a libmp3lame", args);
-        Assert.Contains("-q:a 0", args);
+        AssertPair(args, "-c:a", "libmp3lame");
+        AssertPair(args, "-q:a", "0");
         Assert.DoesNotContain("-b:a", args);
-        Assert.Contains("\"C:\\out.mp3\"", args);
-        Assert.StartsWith("-y", args);
+        Assert.Equal(@"C:\out.mp3", args[^1]);
+        Assert.Equal("-y", args[0]);
     }
 
     [Fact]
@@ -36,13 +36,13 @@ public class FFmpegArgumentsTests
     {
         var args = FFmpegArguments.ForMuxMp4(@"C:\v.mp4", @"C:\a.m4a", @"C:\out.mp4");
 
-        Assert.Contains("-i \"C:\\v.mp4\"", args);
-        Assert.Contains("-i \"C:\\a.m4a\"", args);
-        Assert.Contains("-c:v copy", args);
-        Assert.Contains("-c:a aac", args);
-        Assert.Contains("-b:a 192k", args);
-        Assert.Contains("-movflags +faststart", args);
-        Assert.EndsWith("\"C:\\out.mp4\"", args);
+        AssertPair(args, "-i", @"C:\v.mp4");
+        AssertPair(args, "-i", @"C:\a.m4a");
+        AssertPair(args, "-c:v", "copy");
+        AssertPair(args, "-c:a", "aac");
+        AssertPair(args, "-b:a", "192k");
+        AssertPair(args, "-movflags", "+faststart");
+        Assert.Equal(@"C:\out.mp4", args[^1]);
     }
 
     [Fact]
@@ -50,15 +50,15 @@ public class FFmpegArgumentsTests
     {
         var args = FFmpegArguments.ForMuxMp4CopyAudio(@"C:\v.mp4", @"C:\a.mp4", @"C:\out.mp4");
 
-        Assert.StartsWith("-y", args);
-        Assert.Contains("-i \"C:\\v.mp4\"", args);
-        Assert.Contains("-i \"C:\\a.mp4\"", args);
-        Assert.Contains("-c:v copy", args);
-        Assert.Contains("-c:a copy", args);
-        Assert.Contains("-movflags +faststart", args);
-        Assert.DoesNotContain("-c:a aac", args);
+        Assert.Equal("-y", args[0]);
+        AssertPair(args, "-i", @"C:\v.mp4");
+        AssertPair(args, "-i", @"C:\a.mp4");
+        AssertPair(args, "-c:v", "copy");
+        AssertPair(args, "-c:a", "copy");
+        AssertPair(args, "-movflags", "+faststart");
+        Assert.DoesNotContain("aac", args);
         Assert.DoesNotContain("-b:a", args);
-        Assert.EndsWith("\"C:\\out.mp4\"", args);
+        Assert.Equal(@"C:\out.mp4", args[^1]);
     }
 
     [Fact]
@@ -66,11 +66,17 @@ public class FFmpegArgumentsTests
     {
         var args = FFmpegArguments.ForRemuxOpus(@"C:\in.webm", @"C:\out.opus");
 
-        Assert.StartsWith("-y", args);
-        Assert.Contains("-i \"C:\\in.webm\"", args);
+        Assert.Equal("-y", args[0]);
+        AssertPair(args, "-i", @"C:\in.webm");
         Assert.Contains("-vn", args);
-        Assert.Contains("-c:a copy", args);
+        AssertPair(args, "-c:a", "copy");
         Assert.DoesNotContain("libopus", args);
-        Assert.EndsWith("\"C:\\out.opus\"", args);
+        Assert.Equal(@"C:\out.opus", args[^1]);
+    }
+
+    private static void AssertPair(IReadOnlyList<string> args, string flag, string value)
+    {
+        var found = Enumerable.Range(0, args.Count - 1).Any(i => args[i] == flag && args[i + 1] == value);
+        Assert.True(found, $"Expected '{flag} {value}' in: {string.Join(" | ", args)}");
     }
 }

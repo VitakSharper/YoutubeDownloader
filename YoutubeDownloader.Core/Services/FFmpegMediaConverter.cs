@@ -26,18 +26,20 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath, FFmpegArguments.ForRemuxOpus(input, output), duration, progress, ct);
 
-    internal static async Task RunAsync(string ffmpegPath, string arguments, TimeSpan duration,
+    internal static async Task RunAsync(string ffmpegPath, IReadOnlyList<string> arguments, TimeSpan duration,
         IProgress<double>? progress, CancellationToken ct)
     {
         var psi = new ProcessStartInfo
         {
             FileName = ffmpegPath,
-            Arguments = arguments,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        // One argv token per element: .NET quotes/escapes each, so titles containing quotes are safe.
+        foreach (var argument in arguments)
+            psi.ArgumentList.Add(argument);
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var totalSeconds = duration.TotalSeconds;

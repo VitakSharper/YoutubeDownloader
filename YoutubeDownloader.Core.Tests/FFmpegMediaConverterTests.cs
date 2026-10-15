@@ -33,7 +33,7 @@ public class FFmpegMediaConverterTests
         // after ~30s so an unfixed (orphaning) run cannot leak a long-lived process.
         var heartbeat = Path.Combine(Path.GetTempPath(), "ffmpeg-cancel-heartbeat-" + Guid.NewGuid().ToString("N") + ".txt");
         var script = $"for ($i = 0; $i -lt 300; $i++) {{ Set-Content -LiteralPath '{heartbeat}' -Value $i; Start-Sleep -Milliseconds 100 }}";
-        var arguments = $"-NoProfile -NonInteractive -Command \"{script}\"";
+        var arguments = new[] { "-NoProfile", "-NonInteractive", "-Command", script };
 
         using var cts = new CancellationTokenSource();
         var run = FFmpegMediaConverter.RunAsync("powershell.exe", arguments, TimeSpan.Zero, null, cts.Token);
@@ -62,7 +62,7 @@ public class FFmpegMediaConverterTests
             "[Console]::Error.WriteLine('size=     256kB time=00:00:10.00 bitrate= 209.7kbits/s'); " +
             "[Console]::Error.WriteLine('C:\\in.webm: Invalid data found when processing input'); " +
             "[Console]::Error.WriteLine('Conversion failed!'); exit 1";
-        var arguments = $"-NoProfile -NonInteractive -Command \"{script}\"";
+        var arguments = new[] { "-NoProfile", "-NonInteractive", "-Command", script };
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             FFmpegMediaConverter.RunAsync("powershell.exe", arguments, TimeSpan.Zero, null, CancellationToken.None));
@@ -76,7 +76,7 @@ public class FFmpegMediaConverterTests
     [Fact]
     public async Task RunAsync_WhenProcessFailsSilently_FallsBackToExitCodeOnly()
     {
-        var arguments = "-NoProfile -NonInteractive -Command \"exit 3\"";
+        var arguments = new[] { "-NoProfile", "-NonInteractive", "-Command", "exit 3" };
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             FFmpegMediaConverter.RunAsync("powershell.exe", arguments, TimeSpan.Zero, null, CancellationToken.None));
