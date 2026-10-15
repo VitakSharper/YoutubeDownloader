@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
@@ -143,5 +144,27 @@ public class QueueErrorsTests
         var failure = QueueErrors.ForDownloadFailure(cause.Message, cause);
 
         Assert.Equal(new ItemState.Failed("The disk is full", FailureKind.DiskFull), failure);
+    }
+
+    [Fact]
+    public void ForDownloadFailure_AnythingElse_FallsBackToOther()
+    {
+        Assert.Equal(new ItemState.Failed("Something broke", FailureKind.Other),
+            QueueErrors.ForDownloadFailure("Something broke", new InvalidOperationException("Something broke")));
+        Assert.Equal(new ItemState.Failed("No cause given", FailureKind.Other),
+            QueueErrors.ForDownloadFailure("No cause given", null));
+    }
+
+    [Fact]
+    public void NoStream_OpusAndMp4_AreNoStreamFailures()
+    {
+        Assert.Equal(new ItemState.Failed("No Opus audio stream", FailureKind.NoStream), QueueErrors.NoStream(new QueueFormat.Opus()));
+        Assert.Equal(new ItemState.Failed("No MP4 video stream", FailureKind.NoStream), QueueErrors.NoStream(new QueueFormat.Mp4(1080)));
+    }
+
+    [Fact]
+    public void NoStream_Mp3_IsUnreachable()
+    {
+        Assert.Throws<UnreachableException>(() => QueueErrors.NoStream(new QueueFormat.Mp3(Mp3Quality.BestVbr)));
     }
 }
