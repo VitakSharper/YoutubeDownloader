@@ -344,19 +344,24 @@ public partial class MainViewModel : ObservableObject
                 var videoQuality = selectedVideoQuality ?? info.VideoOptions.First();
                 formatLabel = $"MP4 · {videoQuality.QualityLabel}";
                 StatusMessage = $"Downloading video ({videoQuality.QualityLabel})…";
+                var audio = info.BestMp4Audio ?? info.BestAudio;
                 var tempVideo = _temp.NewTempFile(videoQuality.Container);
                 tempFiles.Add(tempVideo);
-                var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
+                var tempAudio = _temp.NewTempFile(audio.Container);
                 tempFiles.Add(tempAudio);
 
                 await _youtube.DownloadStreamAsync(videoQuality.Source, tempVideo,
                     new Progress<double>(p => Progress = 0.1 + p * 0.4), token);
-                await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
+                await _youtube.DownloadStreamAsync(audio.Source, tempAudio,
                     new Progress<double>(p => Progress = 0.5 + p * 0.2), token);
 
                 StatusMessage = "Merging video + audio…";
-                await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, part,
-                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
+                if (info.BestMp4Audio is not null)
+                    await _converter.MuxToMp4CopyAudioAsync(ffmpegPath, tempVideo, tempAudio, part,
+                        info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
+                else
+                    await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, part,
+                        info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
             }
 
             _output.Commit(part, target);
