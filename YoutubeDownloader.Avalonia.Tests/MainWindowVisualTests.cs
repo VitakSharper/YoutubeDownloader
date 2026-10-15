@@ -22,6 +22,8 @@ namespace YoutubeDownloader.Avalonia.Tests;
 public class MainWindowVisualTests
 {
     private const string VideoUrl = "https://youtu.be/jNQXAC9IVRw";
+    private const string PlaylistUrl = "https://www.youtube.com/playlist?list=PL601B2E69B03FAB9D";
+    private const string WatchInListUrl = "https://www.youtube.com/watch?v=uPZSSdkGQhM&list=PLI5YfMzCfRtZ8eV576YoY3vIYrHjyVm_e&index=1";
 
     private readonly Mock<IYouTubeService> _youtube = new();
     private readonly Mock<IFFmpegLocator> _ffmpeg = new();
@@ -33,6 +35,7 @@ public class MainWindowVisualTests
     private readonly Mock<IConfirmationService> _confirm = new();
     private readonly Mock<IUpdateService> _updates = new();
     private readonly Mock<ISelfUpdater> _selfUpdater = new();
+    private readonly Mock<IClipboardService> _clipboard = new();
 
     public MainWindowVisualTests()
     {
@@ -208,12 +211,83 @@ public class MainWindowVisualTests
         Snapshot(window, "011-thumbnail");
     }
 
+    [AvaloniaFact]
+    public async Task PlaylistUrl_ShowsCardChecklistAndSelectAll()
+    {
+        var (window, vm, _) = Create();
+
+        await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), PharmacologyItems());
+
+        var texts = VisibleTexts(window);
+        Assert.Contains("Pharmacology", texts);
+        Assert.Contains("Armando Hasudungan · 5 videos", texts);
+        Assert.Contains("Select all (5 of 5)", texts);
+        Assert.Contains("Etanercept", texts);
+        Assert.Contains("001", texts);
+        Assert.Contains("12:16", texts);
+        Assert.DoesNotContain("MP3 QUALITY", texts);
+        Assert.DoesNotContain("VIDEO QUALITY", texts);
+        var checklist = Checklist(window);
+        Assert.True(checklist.Bounds.Height >= 112, $"The checklist is {checklist.Bounds.Height} px tall; 4 rows need 112 px.");
+        Snapshot(window, "026a-playlist-card");
+    }
+
+    [AvaloniaFact]
+    public async Task WatchLinkWithList_ShowsTheChoiceBanner()
+    {
+        var (window, vm, _) = Create();
+
+        vm.Url = WatchInListUrl;
+        Settle();
+
+        var texts = VisibleTexts(window);
+        Assert.Contains("This link is part of a playlist.", texts);
+        Assert.Contains("This video", texts);
+        Assert.Contains("Whole playlist", texts);
+
+        // Fetch keeps the banner and loads the video under it: the busiest layout of this state.
+        _youtube.Setup(y => y.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(SampleInfo());
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        Settle();
+        Assert.Contains("Whole playlist", VisibleTexts(window));
+        Snapshot(window, "026a-choice-banner");
+    }
+
+    [AvaloniaFact]
+    public async Task LargePlaylist_IsVirtualizedAndWarns()
+    {
+        var (window, vm, _) = Create();
+
+        await FetchPlaylistAsync(vm, PharmacologyInfo(count: 302), LongItems(300));
+
+        var realized = window.GetVisualDescendants().OfType<ListBoxItem>().Count();
+        Assert.InRange(realized, 1, 299);
+        var texts = VisibleTexts(window);
+        Assert.Contains("300 videos: a list this long can take hours to download.", texts);
+        Assert.Contains("2 unavailable videos are hidden by YouTube", texts);
+        Assert.Contains("Select all (300 of 300)", texts);
+        Snapshot(window, "026a-large-list");
+    }
+
+    [AvaloniaFact]
+    public void PlaylistOnClipboard_ShowsThePlaylistBanner()
+    {
+        var (window, vm, _) = Create();
+        _clipboard.Setup(c => c.GetText()).Returns(PlaylistUrl);
+
+        vm.CheckClipboardCommand.Execute(null);
+        Settle();
+
+        Assert.Contains("📋 Found a YouTube playlist on your clipboard.", VisibleTexts(window));
+        Snapshot(window, "026a-clipboard-playlist");
+    }
+
     private (MainWindow Window, MainViewModel Vm, UpdateViewModel Update) Create()
     {
         var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object,
             new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, Mock.Of<IOutputFileService>(), Mock.Of<IThumbnailFetcher>()),
             _saveFile.Object, _history.Object, Mock.Of<ILinkOpener>(), Mock.Of<IFileRevealer>(), _settings.Object,
-            Mock.Of<IClipboardService>(), _confirm.Object, Mock.Of<IFoobar2000Launcher>());
+            _clipboard.Object, _confirm.Object, Mock.Of<IFoobar2000Launcher>());
         var update = new UpdateViewModel(_updates.Object, Mock.Of<IFileRevealer>(), _selfUpdater.Object);
         var window = new MainWindow(vm, new AvaloniaClipboardService(), update);
         window.Show(); // raises Opened → the silent startup update check
@@ -228,6 +302,51 @@ public class MainWindowVisualTests
         await vm.FetchInfoCommand.ExecuteAsync(null);
         Settle();
     }
+
+    private async Task FetchPlaylistAsync(MainViewModel vm, PlaylistInfo info, IReadOnlyList<QueueItem> items)
+    {
+        _youtube.Setup(y => y.GetPlaylistAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _youtube.Setup(y => y.GetPlaylistItemBatchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() => Batches(items));
+        vm.Url = PlaylistUrl;
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        Settle();
+    }
+
+    /// <summary>Pages of 200, like YouTube.</summary>
+    private static async IAsyncEnumerable<IReadOnlyList<QueueItem>> Batches(IReadOnlyList<QueueItem> items)
+    {
+        foreach (var batch in items.Chunk(200))
+            yield return batch;
+        await Task.CompletedTask;   // keeps the compiler quiet about an async iterator without await
+    }
+
+    private static PlaylistInfo PharmacologyInfo(int count) =>
+        new("PL601B2E69B03FAB9D", "Pharmacology", "Armando Hasudungan", count, null);
+
+    /// <summary>The first five entries of the spike's Pharmacology list.</summary>
+    private static IReadOnlyList<QueueItem> PharmacologyItems() =>
+    [
+        Entry(1, "Nociceptors - An Introduction to Pain", TimeSpan.FromSeconds(736)),
+        Entry(2, "G Protein Signalling", TimeSpan.FromSeconds(568)),
+        Entry(3, "Part I - Aracidonic Acid Metabolites", TimeSpan.FromSeconds(600)),
+        Entry(4, "Part II - Aracidonic Acid Metabolites", TimeSpan.FromSeconds(517)),
+        Entry(5, "Etanercept", TimeSpan.FromSeconds(440))
+    ];
+
+    /// <summary>Titles of every length and the three duration forms, to check ellipsis and column alignment.</summary>
+    private static IReadOnlyList<QueueItem> LongItems(int count) =>
+        Enumerable.Range(1, count)
+            .Select(i => Entry(i,
+                i % 3 == 0 ? $"Lecture {i}: a very long title that has to end in an ellipsis before the duration column" : $"Lecture {i}",
+                i % 7 == 0 ? null : i % 5 == 0 ? TimeSpan.FromSeconds(3723) : TimeSpan.FromSeconds(60 + i * 7)))
+            .ToList();
+
+    private static QueueItem Entry(int index, string title, TimeSpan? duration) =>
+        new($"vid{index:D8}", PlaylistMapping.WatchUrl($"vid{index:D8}"), title, "Armando Hasudungan", duration, index, null);
+
+    private static ListBox Checklist(Window window) =>
+        window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Classes.Contains("checklist"));
 
     private static VideoInfo SampleInfo() => new(
         SourceUrl: VideoUrl,
