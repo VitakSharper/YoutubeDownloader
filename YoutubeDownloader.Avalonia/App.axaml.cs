@@ -63,6 +63,7 @@ public partial class App : Application
         services.AddSingleton<IOutputFileService, OutputFileService>();
         services.AddSingleton<IDownloadPipeline, DownloadPipeline>();
         services.AddSingleton<ISaveFileService, AvaloniaSaveFileService>();
+        services.AddSingleton<IFolderPickerService, AvaloniaFolderPickerService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
         services.AddSingleton<ISettingsStore>(_ => new JsonSettingsStore(baseDir));
         services.AddSingleton<ILinkOpener, ProcessLinkOpener>();
