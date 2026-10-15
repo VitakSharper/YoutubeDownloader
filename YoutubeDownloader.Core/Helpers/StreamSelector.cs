@@ -23,4 +23,13 @@ public static class StreamSelector
             .Where(a => a.Codec.Contains("opus", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(a => a.BitrateKbps)
             .FirstOrDefault();
+
+    /// <summary>Best AAC ("mp4a…") audio stream in an MP4 container — can be stream-copied into an .mp4.</summary>
+    public static AudioStreamOption? PickBestMp4Audio(IEnumerable<AudioStreamOption> audio)
+        => audio
+            .Where(a => a.Codec.StartsWith("mp4a", StringComparison.OrdinalIgnoreCase)
+                        && (string.Equals(a.Container, "mp4", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(a.Container, "m4a", StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(a => a.BitrateKbps)
+            .FirstOrDefault();
 }

@@ -11,6 +11,9 @@ public class StreamSelectorTests
     private static AudioStreamOption Opus(int kbps)
         => new("opus", kbps, "webm", Source: null!);
 
+    private static AudioStreamOption Aac(int kbps, string container = "mp4")
+        => new("mp4a.40.2", kbps, container, Source: null!);
+
     private static VideoStreamOption Video(string label, int height, string container)
         => new(label, height, container, Source: null!);
 
@@ -58,6 +61,29 @@ public class StreamSelectorTests
     public void PickBestOpusAudio_ReturnsNull_WhenNoOpusStream()
     {
         var best = StreamSelector.PickBestOpusAudio(new[] { Audio(128), Audio(256) });
+        Assert.Null(best);
+    }
+
+    [Fact]
+    public void PickBestMp4Audio_ReturnsHighestBitrateAac_IgnoringOpus()
+    {
+        var best = StreamSelector.PickBestMp4Audio(new[] { Opus(160), Aac(48), Aac(128) });
+        Assert.NotNull(best);
+        Assert.Equal(128, best!.BitrateKbps);
+        Assert.Equal("mp4a.40.2", best.Codec);
+    }
+
+    [Fact]
+    public void PickBestMp4Audio_ReturnsNull_WhenOnlyOpus()
+    {
+        var best = StreamSelector.PickBestMp4Audio(new[] { Opus(160), Opus(70) });
+        Assert.Null(best);
+    }
+
+    [Fact]
+    public void PickBestMp4Audio_IgnoresMp4aInNonMp4Container()
+    {
+        var best = StreamSelector.PickBestMp4Audio(new[] { Aac(128, container: "webm") });
         Assert.Null(best);
     }
 }
