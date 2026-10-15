@@ -25,6 +25,7 @@ public sealed class YoutubeExplodeService : IYouTubeService
 
         var bestAudio = StreamSelector.PickBestAudio(audioOptions);
         var bestOpus = StreamSelector.PickBestOpusAudio(audioOptions);
+        var bestMp4Audio = StreamSelector.PickBestMp4Audio(audioOptions);
 
         var videoOptions = StreamSelector.OrderVideoOptions(
             manifest.GetVideoOnlyStreams()
@@ -42,7 +43,8 @@ public sealed class YoutubeExplodeService : IYouTubeService
             ThumbnailUrl: thumb,
             BestAudio: bestAudio,
             VideoOptions: videoOptions,
-            BestOpusAudio: bestOpus);
+            BestOpusAudio: bestOpus,
+            BestMp4Audio: bestMp4Audio);
     }
 
     public async Task DownloadStreamAsync(IStreamInfo stream, string filePath, IProgress<double>? progress, CancellationToken ct)

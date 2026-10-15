@@ -18,6 +18,10 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath, FFmpegArguments.ForMuxMp4(videoInput, audioInput, output), duration, progress, ct);
 
+    public Task MuxToMp4CopyAudioAsync(string ffmpegPath, string videoInput, string audioInput, string output,
+        TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
+        => RunAsync(ffmpegPath, FFmpegArguments.ForMuxMp4CopyAudio(videoInput, audioInput, output), duration, progress, ct);
+
     public Task RemuxToOpusAsync(string ffmpegPath, string input, string output,
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath, FFmpegArguments.ForRemuxOpus(input, output), duration, progress, ct);

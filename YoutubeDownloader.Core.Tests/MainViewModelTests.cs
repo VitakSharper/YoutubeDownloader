@@ -35,8 +35,10 @@ public class MainViewModelTests
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
             _confirm.Object, _foobar.Object, _output.Object);
 
+    private static readonly IStreamInfo AacSource = Mock.Of<IStreamInfo>();
+
     private static VideoInfo SampleInfo(int sourceAudioKbps = 128, bool withOpus = true,
-        string sourceUrl = "https://youtu.be/dQw4w9WgXcQ") => new(
+        string sourceUrl = "https://youtu.be/dQw4w9WgXcQ", bool withAac = false) => new(
         SourceUrl: sourceUrl,
         Title: "Test Video",
         Author: "Tester",
@@ -44,7 +46,8 @@ public class MainViewModelTests
         ThumbnailUrl: "",
         BestAudio: new AudioStreamOption("opus", sourceAudioKbps, "webm", Source: null!),
         VideoOptions: new[] { new VideoStreamOption("720p", 720, "mp4", Source: null!) },
-        BestOpusAudio: withOpus ? new AudioStreamOption("opus", 160, "webm", Source: null!) : null);
+        BestOpusAudio: withOpus ? new AudioStreamOption("opus", 160, "webm", Source: null!) : null,
+        BestMp4Audio: withAac ? new AudioStreamOption("mp4a.40.2", 128, "mp4", Source: AacSource) : null);
 
     [Fact]
     public async Task FetchInfo_WithInvalidUrl_SetsErrorAndDoesNotCallService()
@@ -188,6 +191,57 @@ public class MainViewModelTests
             It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         _converter.Verify(c => c.MuxToMp4Async(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\v.mp4", @"C:\temp\a.webm",
             @"C:\out\clip.part.mp4", info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Download_VideoMode_WithAacStream_DownloadsAacAndStreamCopies()
+    {
+        var info = SampleInfo(withAac: true);
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.SetupSequence(t => t.NewTempFile(It.IsAny<string>()))
+             .Returns(@"C:\temp\v.mp4").Returns(@"C:\temp\a.mp4");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp4", It.IsAny<string?>())).ReturnsAsync(@"C:\out\clip.mp4");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _youtube.Verify(s => s.DownloadStreamAsync(AacSource, @"C:\temp\a.mp4",
+            It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _temp.Verify(t => t.NewTempFile("mp4"), Times.Exactly(2));
+        _converter.Verify(c => c.MuxToMp4CopyAudioAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\v.mp4", @"C:\temp\a.mp4",
+            It.IsAny<string>(), info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _converter.Verify(c => c.MuxToMp4Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Download_VideoMode_WithoutAacStream_FallsBackToReencodeMux()
+    {
+        var info = SampleInfo();
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.SetupSequence(t => t.NewTempFile(It.IsAny<string>()))
+             .Returns(@"C:\temp\v.mp4").Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp4", It.IsAny<string?>())).ReturnsAsync(@"C:\out\clip.mp4");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        _converter.Verify(c => c.MuxToMp4Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _converter.Verify(c => c.MuxToMp4CopyAudioAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
