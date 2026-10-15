@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
-using YoutubeExplode.Videos.Streams;
 
 namespace YoutubeDownloader.Core.ViewModels;
 
@@ -15,9 +15,8 @@ public partial class MainViewModel : ObservableObject
 
     private readonly IYouTubeService _youtube;
     private readonly IFFmpegLocator _ffmpeg;
-    private readonly IMediaConverter _converter;
+    private readonly IDownloadPipeline _pipeline;
     private readonly ISaveFileService _saveFile;
-    private readonly ITempFileService _temp;
     private readonly IHistoryStore _history;
     private readonly ILinkOpener _linkOpener;
     private readonly IFileRevealer _fileRevealer;
@@ -25,21 +24,17 @@ public partial class MainViewModel : ObservableObject
     private readonly IClipboardService _clipboard;
     private readonly IConfirmationService _confirm;
     private readonly IFoobar2000Launcher _foobar;
-    private readonly IOutputFileService _output;
-    private readonly IThumbnailFetcher _thumbnails;
     private readonly AppSettings _appSettings;
 
-    public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
-        ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
+    public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IDownloadPipeline pipeline,
+        ISaveFileService saveFile, IHistoryStore history, ILinkOpener linkOpener,
         IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
-        IConfirmationService confirm, IFoobar2000Launcher foobar, IOutputFileService output,
-        IThumbnailFetcher thumbnails)
+        IConfirmationService confirm, IFoobar2000Launcher foobar)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
-        _converter = converter;
+        _pipeline = pipeline;
         _saveFile = saveFile;
-        _temp = temp;
         _history = history;
         _linkOpener = linkOpener;
         _fileRevealer = fileRevealer;
@@ -47,8 +42,6 @@ public partial class MainViewModel : ObservableObject
         _clipboard = clipboard;
         _confirm = confirm;
         _foobar = foobar;
-        _output = output;
-        _thumbnails = thumbnails;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -330,11 +323,6 @@ public partial class MainViewModel : ObservableObject
         }
 
         RememberSaveFolder(target);
-        var part = PartFilePath.For(target);
-        var committed = false;
-
-        var tempFiles = new List<string>();
-        string formatLabel = "";
         try
         {
             _downloadCts = new CancellationTokenSource();
@@ -346,87 +334,21 @@ public partial class MainViewModel : ObservableObject
             var ffmpegPath = await _ffmpeg.EnsureAsync(
                 new Progress<double>(p => Progress = p * 0.1), token);
 
-            if (mode == DownloadMode.AudioMp3)
+            // Built inside the try, after FFmpeg, like today: VideoOptions.First() failing still reads "Download failed: …".
+            OutputFormat format = mode switch
             {
-                StatusMessage = "Downloading audio…";
-                var tempAudio = _temp.NewTempFile(info.BestAudio.Container);
-                tempFiles.Add(tempAudio);
-                await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
-                    new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
-
-                var tags = BuildTags(info);
-                var cover = await _thumbnails.TryDownloadAsync(info.CoverArtUrl ?? info.ThumbnailUrl, token);
-                if (cover is not null)
-                    tempFiles.Add(cover);
-
-                StatusMessage = $"Converting to MP3 ({quality.Label})…";
-                var convertProgress = new Progress<double>(p => Progress = 0.7 + p * 0.3);
-                try
-                {
-                    await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, tags, cover,
-                        info.Duration, convertProgress, token);
-                }
-                catch (Exception ex) when (cover is not null && ex is not OperationCanceledException && !token.IsCancellationRequested)
-                {
-                    // Cover art is best-effort: an image FFmpeg can't use must not cost the download.
-                    await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, tags, null,
-                        info.Duration, convertProgress, token);
-                }
-                formatLabel = $"MP3 · {quality.HistoryLabel}";
-            }
-            else if (mode == DownloadMode.AudioOpus)
-            {
-                StatusMessage = "Downloading audio…";
-                var tempAudio = _temp.NewTempFile(info.BestOpusAudio!.Container);
-                tempFiles.Add(tempAudio);
-                await _youtube.DownloadStreamAsync(info.BestOpusAudio.Source, tempAudio,
-                    new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
-
-                StatusMessage = "Saving Opus audio…";
-                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part, BuildTags(info),
-                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
-                formatLabel = $"Opus · {info.BestOpusAudio.BitrateKbps} kbps";
-            }
-            else
-            {
-                var videoQuality = selectedVideoQuality ?? info.VideoOptions.First();
-                formatLabel = $"MP4 · {videoQuality.QualityLabel}";
-                StatusMessage = $"Downloading video ({videoQuality.QualityLabel})…";
-                var audio = info.BestMp4Audio ?? info.BestAudio;
-                var tempVideo = _temp.NewTempFile(videoQuality.Container);
-                tempFiles.Add(tempVideo);
-                var tempAudio = _temp.NewTempFile(audio.Container);
-                tempFiles.Add(tempAudio);
-
-                // Video and audio are independent streams: fetch both at once.
-                // Progress window 0.1–0.7 is shared, weighted 80% video / 20% audio.
-                var streams = new CombinedProgress(firstWeight: 0.8);
-                using (var streamsCts = CancellationTokenSource.CreateLinkedTokenSource(token))
-                {
-                    var videoTask = DownloadCancellingSiblingAsync(videoQuality.Source, tempVideo,
-                        new Progress<double>(p => Progress = 0.1 + streams.ReportFirst(p) * 0.6), streamsCts);
-                    var audioTask = DownloadCancellingSiblingAsync(audio.Source, tempAudio,
-                        new Progress<double>(p => Progress = 0.1 + streams.ReportSecond(p) * 0.6), streamsCts);
-                    await Task.WhenAll(videoTask, audioTask);
-                }
-
-                StatusMessage = "Merging video + audio…";
-                if (info.BestMp4Audio is not null)
-                    await _converter.MuxToMp4CopyAudioAsync(ffmpegPath, tempVideo, tempAudio, part,
-                        info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
-                else
-                    await _converter.MuxToMp4Async(ffmpegPath, tempVideo, tempAudio, part,
-                        info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
-            }
-
-            _output.Commit(part, target);
-            committed = true;
-            Progress = 1.0;
-            StatusMessage = $"Done! Saved to {target}";
-            RecordHistory(info.SourceUrl, info.Title, formatLabel, target);
+                DownloadMode.AudioMp3 => new OutputFormat.Mp3(quality),
+                DownloadMode.AudioOpus => new OutputFormat.Opus(),
+                _ => new OutputFormat.Mp4(selectedVideoQuality ?? info.VideoOptions.First())
+            };
+            var request = new DownloadRequest(info, format, target, BuildTags(info), ffmpegPath);
+            var outcome = await _pipeline.RunAsync(request,
+                new InlineProgress<PipelineProgress>(p => ShowPipelineProgress(p, format)), token);
+            ShowOutcome(outcome, info);
         }
         catch (OperationCanceledException)
         {
+            // Only EnsureAsync can still throw here; the pipeline returns its outcomes.
             StatusMessage = "Download cancelled.";
             Progress = 0;
         }
@@ -440,12 +362,33 @@ public partial class MainViewModel : ObservableObject
             IsDownloading = false;
             _downloadCts?.Dispose();
             _downloadCts = null;
-            if (!committed) _output.Discard(part);
-            foreach (var f in tempFiles)
-            {
-                try { if (File.Exists(f)) File.Delete(f); }
-                catch { /* best-effort temp cleanup */ }
-            }
+        }
+    }
+
+    private void ShowPipelineProgress(PipelineProgress progress, OutputFormat format)
+    {
+        StatusMessage = PipelineStatusText.For(progress.Stage, format);
+        Progress = 0.1 + progress.Fraction * 0.9;
+    }
+
+    private void ShowOutcome(DownloadOutcome outcome, VideoInfo info)
+    {
+        switch (outcome)
+        {
+            case DownloadOutcome.Saved saved:
+                Progress = 1.0;
+                StatusMessage = $"Done! Saved to {saved.Path}";
+                RecordHistory(info.SourceUrl, info.Title, saved.FormatLabel, saved.Path);
+                break;
+            case DownloadOutcome.Cancelled:
+                StatusMessage = "Download cancelled.";
+                Progress = 0;
+                break;
+            case DownloadOutcome.Failed failed:
+                StatusMessage = $"Download failed: {failed.Message}";
+                break;
+            default:
+                throw new UnreachableException();
         }
     }
 
@@ -457,24 +400,6 @@ public partial class MainViewModel : ObservableObject
     }
 
     private bool CanCancelDownload() => IsDownloading;
-
-    /// <summary>
-    /// Downloads one stream of a parallel pair. If it fails (or is cancelled), it cancels the
-    /// sibling download too, so no download keeps writing a temp file that cleanup is deleting.
-    /// </summary>
-    private async Task DownloadCancellingSiblingAsync(IStreamInfo source, string filePath,
-        IProgress<double> progress, CancellationTokenSource siblings)
-    {
-        try
-        {
-            await _youtube.DownloadStreamAsync(source, filePath, progress, siblings.Token);
-        }
-        catch
-        {
-            siblings.Cancel();
-            throw;
-        }
-    }
 
     /// <summary>Tags written into MP3/Opus files; the source URL is the one recorded in history.</summary>
     private static MediaTags BuildTags(VideoInfo info)

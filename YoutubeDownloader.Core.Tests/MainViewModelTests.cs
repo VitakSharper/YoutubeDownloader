@@ -32,9 +32,10 @@ public class MainViewModelTests
     }
 
     private MainViewModel CreateSut() =>
-        new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
-            _confirm.Object, _foobar.Object, _output.Object, _thumbnails.Object);
+        new(_youtube.Object, _ffmpeg.Object,
+            new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, _output.Object, _thumbnails.Object),
+            _saveFile.Object, _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object,
+            _clipboard.Object, _confirm.Object, _foobar.Object);
 
     private static readonly IStreamInfo AacSource = Mock.Of<IStreamInfo>();
 

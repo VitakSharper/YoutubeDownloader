@@ -210,9 +210,10 @@ public class MainWindowVisualTests
 
     private (MainWindow Window, MainViewModel Vm, UpdateViewModel Update) Create()
     {
-        var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
-            _history.Object, Mock.Of<ILinkOpener>(), Mock.Of<IFileRevealer>(), _settings.Object, Mock.Of<IClipboardService>(),
-            _confirm.Object, Mock.Of<IFoobar2000Launcher>(), Mock.Of<IOutputFileService>(), Mock.Of<IThumbnailFetcher>());
+        var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object,
+            new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, Mock.Of<IOutputFileService>(), Mock.Of<IThumbnailFetcher>()),
+            _saveFile.Object, _history.Object, Mock.Of<ILinkOpener>(), Mock.Of<IFileRevealer>(), _settings.Object,
+            Mock.Of<IClipboardService>(), _confirm.Object, Mock.Of<IFoobar2000Launcher>());
         var update = new UpdateViewModel(_updates.Object, Mock.Of<IFileRevealer>(), _selfUpdater.Object);
         var window = new MainWindow(vm, new AvaloniaClipboardService(), update);
         window.Show(); // raises Opened → the silent startup update check

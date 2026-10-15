@@ -61,6 +61,7 @@ public partial class App : Application
             // Cover art is best-effort: a stalled thumbnail server must not hold the download for HttpClient's default 100 s.
             new HttpThumbnailFetcher(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }, sp.GetRequiredService<ITempFileService>()));
         services.AddSingleton<IOutputFileService, OutputFileService>();
+        services.AddSingleton<IDownloadPipeline, DownloadPipeline>();
         services.AddSingleton<ISaveFileService, AvaloniaSaveFileService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
         services.AddSingleton<ISettingsStore>(_ => new JsonSettingsStore(baseDir));
