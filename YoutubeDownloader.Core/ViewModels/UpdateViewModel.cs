@@ -22,6 +22,7 @@ public partial class UpdateViewModel : ObservableObject
     [ObservableProperty] private bool _isUpdateAvailable;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private double _progress;
+    [ObservableProperty] private bool _isDownloadingUpdate;
 
     [RelayCommand]
     private async Task CheckForUpdatesAsync()
@@ -67,6 +68,7 @@ public partial class UpdateViewModel : ObservableObject
 
         IsBusy = true;
         Progress = 0;
+        IsDownloadingUpdate = true;
         Status = "Downloading…";
         try
         {
@@ -81,6 +83,7 @@ public partial class UpdateViewModel : ObservableObject
         }
         finally
         {
+            IsDownloadingUpdate = false;
             IsBusy = false;
         }
     }

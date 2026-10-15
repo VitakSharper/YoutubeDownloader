@@ -44,6 +44,10 @@
                     Command="{Binding DownloadUpdateCommand}"
                     IsVisible="{Binding IsUpdateAvailable}" IsEnabled="{Binding !IsBusy}" />
           </StackPanel>
+          <ProgressBar Classes="accent" Minimum="0" Maximum="1"
+                       Value="{Binding Progress}"
+                       IsVisible="{Binding IsDownloadingUpdate}"
+                       Width="200" MinHeight="6" Height="6" HorizontalAlignment="Right" />
           <TextBlock Text="{Binding Status}" FontSize="10.5" TextWrapping="Wrap"
                      MaxWidth="240" HorizontalAlignment="Right" TextAlignment="Right"
                      Foreground="{StaticResource TextMutedBrush}"
