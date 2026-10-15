@@ -106,4 +106,76 @@ public class UpdateViewModelTests
         Assert.False(vm.IsUpdateAvailable);
         Assert.Contains("no downloadable file", vm.Status, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task Download_sets_IsDownloadingUpdate_while_running_and_clears_after()
+    {
+        var (vm, svc, _) = Make();
+        var tcs = new TaskCompletionSource<string>();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Available);
+        svc.Setup(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+           .Returns(tcs.Task);
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        var run = vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsDownloadingUpdate);
+
+        tcs.SetResult(@"C:\Downloads\Liudochka-1.1.0\app.exe");
+        await run;
+
+        Assert.False(vm.IsDownloadingUpdate);
+    }
+
+    [Fact]
+    public async Task Download_failure_clears_IsDownloadingUpdate()
+    {
+        var (vm, svc, _) = Make();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Available);
+        svc.Setup(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+           .ThrowsAsync(new HttpRequestException("x"));
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsDownloadingUpdate);
+        Assert.Contains("Couldn't reach GitHub", vm.Status);
+    }
+
+    [Fact]
+    public async Task Check_does_not_set_IsDownloadingUpdate()
+    {
+        var (vm, svc, _) = Make();
+        var tcs = new TaskCompletionSource<UpdateInfo>();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).Returns(tcs.Task);
+
+        var run = vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsBusy);
+        Assert.False(vm.IsDownloadingUpdate);
+
+        tcs.SetResult(Available);
+        await run;
+
+        Assert.False(vm.IsDownloadingUpdate);
+    }
+
+    [Fact]
+    public async Task Download_resets_progress_to_zero_at_start()
+    {
+        var (vm, svc, _) = Make();
+        var tcs = new TaskCompletionSource<string>();
+        svc.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Available);
+        svc.Setup(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+           .Returns(tcs.Task);
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        vm.Progress = 0.7;
+        var run = vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, vm.Progress);
+
+        tcs.SetResult(@"C:\Downloads\Liudochka-1.1.0\app.exe");
+        await run;
+    }
 }
