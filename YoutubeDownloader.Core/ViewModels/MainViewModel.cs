@@ -67,6 +67,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>History filtered by <see cref="SearchText"/> and bucketed by date, for the UI.</summary>
     public ObservableCollection<HistoryGroup> HistoryGroups { get; } = new();
 
+    /// <summary>The playlist runs the user expanded in the History tab, so a regrouping keeps them open.</summary>
+    private readonly HashSet<string> _expandedRuns = new(StringComparer.Ordinal);
+
     public string? HistoryPlaceholder =>
         HistoryGroups.Count > 0
             ? null
@@ -85,9 +88,14 @@ public partial class MainViewModel : ObservableObject
                 e.Url.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         var today = DateOnly.FromDateTime(DateTime.Now);
+        var searching = !string.IsNullOrEmpty(search);   // a search shows every matching run's entries
         var grouped = entries
             .GroupBy(e => DateOnly.FromDateTime(e.DownloadedAt.LocalDateTime))
-            .Select(g => new HistoryGroup(HistoryDateLabel.For(g.Key, today), g.ToList()));
+            .Select(g =>
+            {
+                var list = g.ToList();
+                return new HistoryGroup(HistoryDateLabel.For(g.Key, today), list, HistoryRows.Build(list, _expandedRuns, forceExpanded: searching));
+            });
 
         HistoryGroups.Clear();
         foreach (var group in grouped)
