@@ -7,11 +7,12 @@ namespace YoutubeDownloader.Core.Services;
 public sealed class FFmpegMediaConverter : IMediaConverter
 {
     public Task ConvertToMp3Async(string ffmpegPath, string input, string output, Mp3Quality quality,
+        MediaTags? tags, string? coverPath,
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath,
             quality.IsVbr
-                ? FFmpegArguments.ForMp3Vbr(input, output, quality.VbrQuality)
-                : FFmpegArguments.ForMp3Cbr(input, output, quality.ApproxKbps),
+                ? FFmpegArguments.ForMp3Vbr(input, output, quality.VbrQuality, tags, coverPath)
+                : FFmpegArguments.ForMp3Cbr(input, output, quality.ApproxKbps, tags, coverPath),
             duration, progress, ct);
 
     public Task MuxToMp4Async(string ffmpegPath, string videoInput, string audioInput, string output,
@@ -22,22 +23,24 @@ public sealed class FFmpegMediaConverter : IMediaConverter
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
         => RunAsync(ffmpegPath, FFmpegArguments.ForMuxMp4CopyAudio(videoInput, audioInput, output), duration, progress, ct);
 
-    public Task RemuxToOpusAsync(string ffmpegPath, string input, string output,
+    public Task RemuxToOpusAsync(string ffmpegPath, string input, string output, MediaTags? tags,
         TimeSpan duration, IProgress<double>? progress, CancellationToken ct)
-        => RunAsync(ffmpegPath, FFmpegArguments.ForRemuxOpus(input, output), duration, progress, ct);
+        => RunAsync(ffmpegPath, FFmpegArguments.ForRemuxOpus(input, output, tags), duration, progress, ct);
 
-    internal static async Task RunAsync(string ffmpegPath, string arguments, TimeSpan duration,
+    internal static async Task RunAsync(string ffmpegPath, IReadOnlyList<string> arguments, TimeSpan duration,
         IProgress<double>? progress, CancellationToken ct)
     {
         var psi = new ProcessStartInfo
         {
             FileName = ffmpegPath,
-            Arguments = arguments,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        // One argv token per element: .NET quotes/escapes each, so titles containing quotes are safe.
+        foreach (var argument in arguments)
+            psi.ArgumentList.Add(argument);
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var totalSeconds = duration.TotalSeconds;
