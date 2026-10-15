@@ -244,6 +244,122 @@ public class MainViewModelTests
             It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    private void SetupVideoDownload(VideoInfo info)
+    {
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.SetupSequence(t => t.NewTempFile(It.IsAny<string>()))
+             .Returns(@"C:\temp\v.mp4").Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp4", It.IsAny<string?>())).ReturnsAsync(@"C:\out\clip.mp4");
+    }
+
+    private void VerifyNoMux()
+    {
+        _converter.Verify(c => c.MuxToMp4Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _converter.Verify(c => c.MuxToMp4CopyAudioAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Download_VideoMode_StartsBothStreamsBeforeEitherCompletes()
+    {
+        SetupVideoDownload(SampleInfo());
+        // Each stream blocks on its own gate; record which downloads have started.
+        var videoGate = new TaskCompletionSource();
+        var audioGate = new TaskCompletionSource();
+        var started = new List<string>();
+        _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                    It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                .Returns((IStreamInfo _, string filePath, IProgress<double>? _, CancellationToken ct) =>
+                {
+                    lock (started) started.Add(filePath);
+                    return (filePath == @"C:\temp\v.mp4" ? videoGate : audioGate).Task.WaitAsync(ct);
+                });
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+
+        var download = vm.DownloadCommand.ExecuteAsync(null);
+
+        // Sequential code would block on the video gate and never start the audio download.
+        Assert.True(SpinWait.SpinUntil(() => { lock (started) return started.Count == 2; }, TimeSpan.FromSeconds(5)));
+        lock (started)
+        {
+            Assert.Contains(@"C:\temp\v.mp4", started);
+            Assert.Contains(@"C:\temp\a.webm", started);
+        }
+        Assert.False(download.IsCompleted);
+
+        videoGate.SetResult();
+        audioGate.SetResult();
+        await download.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // SampleInfo() has no AAC stream, so plan 008's re-encode fallback mux is used.
+        _converter.Verify(c => c.MuxToMp4Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(1.0, vm.Progress);
+    }
+
+    [Fact]
+    public async Task Download_VideoMode_WhenAudioFails_CancelsVideoAndReportsFailure()
+    {
+        SetupVideoDownload(SampleInfo());
+        // The video download runs until cancelled; the audio download fails immediately.
+        var videoToken = CancellationToken.None;
+        _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                    It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                .Returns((IStreamInfo _, string filePath, IProgress<double>? _, CancellationToken ct) =>
+                {
+                    if (filePath == @"C:\temp\v.mp4")
+                    {
+                        videoToken = ct;
+                        return Task.Delay(Timeout.Infinite, ct);
+                    }
+                    return Task.FromException(new InvalidOperationException("audio boom"));
+                });
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+
+        await vm.DownloadCommand.ExecuteAsync(null).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(videoToken.IsCancellationRequested);
+        Assert.Equal("Download failed: audio boom", vm.StatusMessage);
+        Assert.Empty(vm.History);
+        Assert.False(vm.IsDownloading);
+        VerifyNoMux();
+    }
+
+    [Fact]
+    public async Task Download_VideoMode_UserCancelDuringParallelStreams_ReportsCancelled()
+    {
+        SetupVideoDownload(SampleInfo());
+        // Both downloads block on one gate that never opens: only a cancel ends them.
+        var gate = new TaskCompletionSource();
+        _youtube.Setup(s => s.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(),
+                    It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+                .Returns((IStreamInfo _, string _, IProgress<double>? _, CancellationToken ct) => gate.Task.WaitAsync(ct));
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = DownloadMode.Video;
+
+        var download = vm.DownloadCommand.ExecuteAsync(null);
+        await vm.CancelDownloadCommand.ExecuteAsync(null);
+        await download.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("Download cancelled.", vm.StatusMessage);
+        Assert.False(vm.IsDownloading);
+        VerifyNoMux();
+    }
+
     [Fact]
     public async Task Download_AudioMode_RecordsHistoryEntry()
     {
