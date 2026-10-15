@@ -8,11 +8,11 @@ public class StreamSelectorTests
     private static AudioStreamOption Audio(int kbps, string container = "mp4")
         => new("aac", kbps, container, Source: null!);
 
-    private static AudioStreamOption Opus(int kbps)
-        => new("opus", kbps, "webm", Source: null!);
+    private static AudioStreamOption Opus(int kbps, bool? original = null)
+        => new("opus", kbps, "webm", Source: null!, IsOriginalLanguage: original);
 
-    private static AudioStreamOption Aac(int kbps, string container = "mp4")
-        => new("mp4a.40.2", kbps, container, Source: null!);
+    private static AudioStreamOption Aac(int kbps, string container = "mp4", bool? original = null)
+        => new("mp4a.40.2", kbps, container, Source: null!, IsOriginalLanguage: original);
 
     private static VideoStreamOption Video(string label, int height, string container)
         => new(label, height, container, Source: null!);
@@ -85,5 +85,60 @@ public class StreamSelectorTests
     {
         var best = StreamSelector.PickBestMp4Audio(new[] { Aac(128, container: "webm") });
         Assert.Null(best);
+    }
+
+    // An English video with AI-dubbed tracks: in each codec a dubbed track out-bitrates the original.
+    private static AudioStreamOption[] DubbedSet(out AudioStreamOption originalOpus, out AudioStreamOption originalAac)
+    {
+        originalOpus = Opus(130, original: true);
+        originalAac = Aac(128, original: true);
+        return new[] { Opus(160, original: false), Opus(70, original: true), originalOpus, Aac(192, original: false), originalAac };
+    }
+
+    [Fact]
+    public void PickBestAudio_DubbedSet_ReturnsBestOriginalLanguageStream()
+    {
+        var input = DubbedSet(out var originalOpus, out _);
+        Assert.Same(originalOpus, StreamSelector.PickBestAudio(input));
+    }
+
+    [Fact]
+    public void PickBestOpusAudio_DubbedSet_ReturnsOriginalLanguageOpus()
+    {
+        var input = DubbedSet(out var originalOpus, out _);
+        Assert.Same(originalOpus, StreamSelector.PickBestOpusAudio(input));
+    }
+
+    [Fact]
+    public void PickBestMp4Audio_DubbedSet_ReturnsOriginalLanguageAac()
+    {
+        var input = DubbedSet(out _, out var originalAac);
+        Assert.Same(originalAac, StreamSelector.PickBestMp4Audio(input));
+    }
+
+    [Theory]
+    [InlineData(null)]  // the manifest gave no language data
+    [InlineData(false)] // language data, but no track flagged as the original
+    public void Pickers_NoOriginalLanguageFlagged_PickHighestBitrate(bool? original)
+    {
+        var bestOpus = Opus(160, original);
+        var bestAac = Aac(192, original: original);
+        var input = new[] { Opus(96, original), bestOpus, Aac(128, original: original), bestAac };
+
+        Assert.Same(bestAac, StreamSelector.PickBestAudio(input));
+        Assert.Same(bestOpus, StreamSelector.PickBestOpusAudio(input));
+        Assert.Same(bestAac, StreamSelector.PickBestMp4Audio(input));
+    }
+
+    [Fact]
+    public void Pickers_OriginalLanguageOnlyInOpus_Mp4StillFindsBestAac()
+    {
+        var originalOpus = Opus(96, original: true);
+        var bestAac = Aac(192, original: false);
+        var input = new[] { Opus(160, original: false), originalOpus, Aac(128, original: false), bestAac };
+
+        Assert.Same(originalOpus, StreamSelector.PickBestOpusAudio(input));
+        Assert.Same(originalOpus, StreamSelector.PickBestAudio(input));
+        Assert.Same(bestAac, StreamSelector.PickBestMp4Audio(input)); // not null: no needless re-encode fallback
     }
 }
