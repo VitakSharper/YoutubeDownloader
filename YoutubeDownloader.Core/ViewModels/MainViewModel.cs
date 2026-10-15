@@ -342,8 +342,12 @@ public partial class MainViewModel : ObservableObject
                 _ => new OutputFormat.Mp4(selectedVideoQuality ?? info.VideoOptions.First())
             };
             var request = new DownloadRequest(info, format, target, BuildTags(info), ffmpegPath);
+            // Reports and this continuation both run on the UI thread. Once the outcome is known, a late
+            // report (e.g. a last FFmpeg line read after a cancel) must not turn "Download cancelled." back into a stage.
+            var acceptReports = true;
             var outcome = await _pipeline.RunAsync(request,
-                new InlineProgress<PipelineProgress>(p => ShowPipelineProgress(p, format)), token);
+                new InlineProgress<PipelineProgress>(p => { if (acceptReports) ShowPipelineProgress(p, format); }), token);
+            acceptReports = false;
             ShowOutcome(outcome, info);
         }
         catch (OperationCanceledException)

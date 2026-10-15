@@ -557,6 +557,30 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task Download_ReportArrivingAfterTheOutcome_DoesNotOverwriteTheFinalStatus()
+    {
+        SetupMp3Download(SampleInfo());
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        IProgress<PipelineProgress>? captured = null;
+        var pipeline = new Mock<IDownloadPipeline>();
+        pipeline.Setup(p => p.RunAsync(It.IsAny<DownloadRequest>(), It.IsAny<IProgress<PipelineProgress>>(), It.IsAny<CancellationToken>()))
+                .Callback<DownloadRequest, IProgress<PipelineProgress>, CancellationToken>((_, progress, _) => captured = progress)
+                .ReturnsAsync(new DownloadOutcome.Cancelled());
+        var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object, pipeline.Object,
+            _saveFile.Object, _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object,
+            _clipboard.Object, _confirm.Object, _foobar.Object);
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        captured!.Report(new PipelineProgress(PipelineStage.Converting, 0.9));
+
+        Assert.Equal("Download cancelled.", vm.StatusMessage);
+        Assert.Equal(0, vm.Progress);
+    }
+
+    [Fact]
     public async Task Download_AfterUrlEditedToSameVideo_RecordsFetchedUrl()
     {
         SetupMp3Download(SampleInfo(sourceUrl: "https://youtu.be/dQw4w9WgXcQ"));
