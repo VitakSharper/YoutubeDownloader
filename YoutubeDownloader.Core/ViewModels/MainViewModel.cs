@@ -143,7 +143,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnAlwaysOnTopChanged(bool value)
     {
         _appSettings.AlwaysOnTop = value;
-        _settings.Save(_appSettings);
+        TrySaveSettings();
     }
 
     /// <summary>A YouTube link detected on the clipboard, surfaced as a suggestion. Null hides the banner.</summary>
@@ -404,7 +404,34 @@ public partial class MainViewModel : ObservableObject
         if (!string.IsNullOrEmpty(folder) && folder != _appSettings.LastSaveFolder)
         {
             _appSettings.LastSaveFolder = folder;
+            TrySaveSettings();
+        }
+    }
+
+    /// <summary>Persists history; returns the error message instead of throwing.</summary>
+    private string? TrySaveHistory()
+    {
+        try
+        {
+            _history.Save(History);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    /// <summary>Persists settings; reports (never throws) on failure.</summary>
+    private void TrySaveSettings()
+    {
+        try
+        {
             _settings.Save(_appSettings);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Couldn't save settings: {ex.Message}";
         }
     }
 
@@ -420,7 +447,8 @@ public partial class MainViewModel : ObservableObject
         });
         while (History.Count > MaxHistory)
             History.RemoveAt(History.Count - 1);
-        _history.Save(History);
+        if (TrySaveHistory() is { } error)
+            StatusMessage = $"Done! Saved to {filePath} — but history couldn't be saved: {error}";
     }
 
     /// <summary>Re-load a past link into the URL box, switch to the Download tab, and fetch it.</summary>
@@ -496,7 +524,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (entry is null || !History.Remove(entry))
             return;
-        _history.Save(History);
+        if (TrySaveHistory() is { } error)
+            StatusMessage = $"Couldn't save history: {error}";
     }
 
     [RelayCommand]
@@ -507,6 +536,7 @@ public partial class MainViewModel : ObservableObject
         if (!await _confirm.ConfirmAsync("Clear all download history? This can't be undone.", "Clear history?"))
             return;
         History.Clear();
-        _history.Save(History);
+        if (TrySaveHistory() is { } error)
+            StatusMessage = $"Couldn't save history: {error}";
     }
 }
