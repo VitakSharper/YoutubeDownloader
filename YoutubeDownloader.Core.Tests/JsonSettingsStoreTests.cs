@@ -58,6 +58,33 @@ public class JsonSettingsStoreTests : IDisposable
         Assert.Equal("not json", File.ReadAllText(copy));
     }
 
+    [Fact]
+    public void Load_OldFileWithoutNewFields_KeepsValuesAndDefaultsTheRest()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "settings.json"),
+            """{ "AlwaysOnTop": false, "LastSaveFolder": "C:\\Music" }""");
+
+        var loaded = new JsonSettingsStore(_dir).Load();
+
+        Assert.False(loaded.AlwaysOnTop);
+        Assert.Equal(@"C:\Music", loaded.LastSaveFolder);
+        Assert.Equal("", loaded.LastMode);
+        Assert.Equal("", loaded.LastMp3Quality);
+    }
+
+    [Fact]
+    public void SaveThenLoad_RoundTripsModeAndQuality()
+    {
+        var store = new JsonSettingsStore(_dir);
+
+        store.Save(new AppSettings { LastMode = "AudioOpus", LastMp3Quality = "cbr-256" });
+
+        var loaded = store.Load();
+        Assert.Equal("AudioOpus", loaded.LastMode);
+        Assert.Equal("cbr-256", loaded.LastMp3Quality);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_dir))
