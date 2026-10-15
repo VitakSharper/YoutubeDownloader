@@ -98,10 +98,13 @@ public partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(FetchInfoCommand))]
     [NotifyCanExecuteChangedFor(nameof(DownloadCommand))]
     [NotifyCanExecuteChangedFor(nameof(UseEntryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ChooseThisVideoCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ChooseWholePlaylistCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelDownloadCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowSingleDownload))]
     private bool _isDownloading;
 
     [ObservableProperty]
@@ -170,19 +173,35 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? _detectedClipboardUrl;
 
-    /// <summary>Video id of the last suggestion the user used or dismissed, so it is not re-offered.</summary>
-    private string? _dismissedVideoId;
+    /// <summary>The banner's text: a playlist on the clipboard is named as one.</summary>
+    [ObservableProperty]
+    private string _detectedClipboardMessage = "📋 Found a YouTube link on your clipboard.";
+
+    /// <summary>The last suggestion the user used or dismissed, so it is not re-offered.</summary>
+    private YouTubeLink? _dismissedLink;
 
     partial void OnSearchTextChanged(string value) => RebuildHistoryGroups();
 
-    /// <summary>Drop the loaded video when the URL box now points at a different video.</summary>
+    /// <summary>
+    /// Follow the URL box offline: show or hide the playlist choice, drop the playlist card when the box
+    /// points at another list, and drop the loaded video when it points at a different video.
+    /// </summary>
     partial void OnUrlChanged(string value)
     {
+        var link = YouTubeLink.Parse(value);
+        PlaylistChoice = LinkAction.For(link) as LinkAction.OfferChoice;   // the banner follows the box, offline
+        if (Playlist is not null && !IsSameList(link, Playlist.ListId))
+        {
+            Playlist = null;
+            StatusMessage = "Press Fetch to load this link.";
+        }
+
         if (VideoInfo is null)
             return;
         if (YouTubeUrlValidator.GetVideoId(value) == YouTubeUrlValidator.GetVideoId(VideoInfo.SourceUrl))
             return; // same video, e.g. a timestamp or a different URL form
         VideoInfo = null;
+        LinkHint = null;
         SelectedVideoQuality = null;
         StatusMessage = "Press Fetch to load this link.";
     }
@@ -210,21 +229,46 @@ public partial class MainViewModel : ObservableObject
     private bool CanFetch() => !IsBusy && !string.IsNullOrWhiteSpace(Url);
     private bool CanDownload() => !IsBusy && VideoInfo is not null;
 
+    /// <summary>Fetch / Enter: routes the link through <see cref="LinkAction.For"/>.</summary>
     [RelayCommand(CanExecute = nameof(CanFetch))]
     private async Task FetchInfoAsync()
     {
-        if (!YouTubeUrlValidator.IsValid(Url))
+        var link = YouTubeLink.Parse(Url);
+        LinkHint = null;
+        switch (LinkAction.For(link))
         {
-            StatusMessage = "That doesn't look like a valid YouTube URL.";
-            return;
+            case LinkAction.Reject reject:
+                StatusMessage = reject.Message;
+                return;
+            case LinkAction.OpenPlaylist open:
+                await LoadPlaylistAsync(open.ListId, open.Kind);
+                return;
+            case LinkAction.OfferChoice choice:
+                PlaylistChoice = choice;            // "Fetch / Enter keeps today's meaning (this video)" (018 §2 rule 6)
+                await FetchVideoAsync(PlaylistMapping.WatchUrl(choice.VideoId));
+                return;
+            case LinkAction.FetchVideo fetch:
+                LinkHint = fetch.Hint;
+                await FetchVideoAsync(link is YouTubeLink.VideoInPlaylist ? PlaylistMapping.WatchUrl(fetch.VideoId) : Url);
+                return;
+            default:
+                throw new UnreachableException();
         }
+    }
 
+    /// <summary>
+    /// A plain video link is fetched as typed; a video taken from a list link by its canonical watch URL,
+    /// so its history entry never carries <c>&amp;list=</c>.
+    /// </summary>
+    private async Task FetchVideoAsync(string url)
+    {
+        Playlist = null;
         try
         {
             IsBusy = true;
             Progress = 0;
             StatusMessage = "Fetching video info…";
-            var info = await _youtube.GetVideoInfoAsync(Url, CancellationToken.None);
+            var info = await _youtube.GetVideoInfoAsync(url, CancellationToken.None);
             VideoInfo = info;
             SelectedVideoQuality = info.VideoOptions.FirstOrDefault();
             StatusMessage = $"Loaded: {info.Title}  •  source audio {QualityAdvisor.Describe(info.BestAudio.Codec, info.SourceAudioKbps)}";
@@ -254,16 +298,16 @@ public partial class MainViewModel : ObservableObject
         }
 
         var text = _clipboard.GetText();
-        var videoId = YouTubeUrlValidator.GetVideoId(text);
-
-        if (videoId is null
-            || videoId == YouTubeUrlValidator.GetVideoId(Url)
-            || videoId == _dismissedVideoId)
+        var link = YouTubeLink.Parse(text);
+        if (LinkAction.For(link) is LinkAction.Reject || link == YouTubeLink.Parse(Url) || link == _dismissedLink)
         {
             DetectedClipboardUrl = null;
             return;
         }
 
+        DetectedClipboardMessage = link is YouTubeLink.Playlist
+            ? "📋 Found a YouTube playlist on your clipboard."
+            : "📋 Found a YouTube link on your clipboard.";
         DetectedClipboardUrl = text;
     }
 
@@ -271,7 +315,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void DismissDetectedLink()
     {
-        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(DetectedClipboardUrl);
+        _dismissedLink = YouTubeLink.Parse(DetectedClipboardUrl);
         DetectedClipboardUrl = null;
     }
 
@@ -283,7 +327,7 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(link))
             return;
 
-        _dismissedVideoId = YouTubeUrlValidator.GetVideoId(link);
+        _dismissedLink = YouTubeLink.Parse(link);
         DetectedClipboardUrl = null;
         Url = link;
 
