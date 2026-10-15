@@ -1155,16 +1155,42 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void ShowQuality_HiddenOnlyForOpusMode()
+    public void ShowQuality_OnlyInMp3Mode()
     {
         var vm = CreateSut();
 
         vm.SelectedMode = DownloadMode.AudioMp3;
         Assert.True(vm.ShowQuality);
         vm.SelectedMode = DownloadMode.Video;
-        Assert.True(vm.ShowQuality);
+        Assert.False(vm.ShowQuality);
         vm.SelectedMode = DownloadMode.AudioOpus;
         Assert.False(vm.ShowQuality);
+    }
+
+    [Fact]
+    public void ShowVideoQuality_OnlyInVideoMode()
+    {
+        var vm = CreateSut();
+
+        vm.SelectedMode = DownloadMode.Video;
+        Assert.True(vm.ShowVideoQuality);
+        vm.SelectedMode = DownloadMode.AudioMp3;
+        Assert.False(vm.ShowVideoQuality);
+        vm.SelectedMode = DownloadMode.AudioOpus;
+        Assert.False(vm.ShowVideoQuality);
+    }
+
+    [Fact]
+    public void SelectedMode_Change_RaisesBothPickerVisibilities()
+    {
+        var vm = CreateSut();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.SelectedMode = DownloadMode.Video;
+
+        Assert.Contains(nameof(MainViewModel.ShowQuality), raised);
+        Assert.Contains(nameof(MainViewModel.ShowVideoQuality), raised);
     }
 
     [Fact]

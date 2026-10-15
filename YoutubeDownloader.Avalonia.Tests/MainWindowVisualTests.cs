@@ -53,8 +53,25 @@ public class MainWindowVisualTests
         await FetchAsync(vm, SampleInfo());
 
         Assert.Equal(Mp3Quality.Cbr256, vm.SelectedQuality);
-        Assert.Contains("256 kbps", VisibleTexts(window));
+        var texts = VisibleTexts(window);
+        Assert.Contains("256 kbps", texts);
+        Assert.Contains("MP3 QUALITY", texts);
+        Assert.DoesNotContain("VIDEO QUALITY", texts);
         Snapshot(window, "016-restored-mp3-256");
+    }
+
+    [AvaloniaFact]
+    public async Task OpusMode_ShowsNoQualityPicker()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "AudioOpus" });
+        var (window, vm, _) = Create();
+
+        await FetchAsync(vm, SampleInfo());
+
+        var texts = VisibleTexts(window);
+        Assert.DoesNotContain("MP3 QUALITY", texts);
+        Assert.DoesNotContain("VIDEO QUALITY", texts);
+        Snapshot(window, "opus-no-pickers");
     }
 
     [AvaloniaFact]
@@ -66,7 +83,10 @@ public class MainWindowVisualTests
         await FetchAsync(vm, SampleInfo());
 
         Assert.Equal(DownloadMode.Video, vm.SelectedMode);
-        Assert.Contains("720p", VisibleTexts(window));
+        var texts = VisibleTexts(window);
+        Assert.Contains("720p", texts);
+        Assert.Contains("VIDEO QUALITY", texts);
+        Assert.DoesNotContain("MP3 QUALITY", texts);
         Snapshot(window, "016-restored-video");
     }
 

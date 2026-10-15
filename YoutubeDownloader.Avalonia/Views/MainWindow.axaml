@@ -131,8 +131,9 @@
               <TextBlock Text="{Binding UpscaleWarning}" Foreground="#FCD34D" FontSize="12" TextWrapping="Wrap" />
             </Border>
 
-            <TextBlock Classes="label" Text="VIDEO QUALITY" />
+            <TextBlock Classes="label" Text="VIDEO QUALITY" IsVisible="{Binding ShowVideoQuality}" />
             <ComboBox Width="260" HorizontalAlignment="Left"
+                      IsVisible="{Binding ShowVideoQuality}"
                       ItemsSource="{Binding VideoInfo.VideoOptions}" SelectedItem="{Binding SelectedVideoQuality}">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="models:VideoStreamOption">

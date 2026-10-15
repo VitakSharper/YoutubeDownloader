@@ -125,6 +125,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UpscaleWarning))]
     [NotifyPropertyChangedFor(nameof(ShowQuality))]
+    [NotifyPropertyChangedFor(nameof(ShowVideoQuality))]
     private DownloadMode _selectedMode = DownloadMode.AudioMp3;
 
     [ObservableProperty]
@@ -196,8 +197,14 @@ public partial class MainViewModel : ObservableObject
     public IReadOnlyList<Mp3Quality> Qualities { get; } = Mp3Quality.All;
     public IReadOnlyList<DownloadMode> Modes { get; } = Enum.GetValues<DownloadMode>();
 
-    /// <summary>Quality only applies to MP3; hidden for the copy-only Opus mode.</summary>
-    public bool ShowQuality => SelectedMode != DownloadMode.AudioOpus;
+    /// <summary>
+    /// The MP3 quality picker shows in MP3 mode only. Opus is a stream copy, and Video copies the AAC track
+    /// (or re-encodes it at a fixed 192 kbps), so neither one reads this setting.
+    /// </summary>
+    public bool ShowQuality => SelectedMode == DownloadMode.AudioMp3;
+
+    /// <summary>The video quality picker shows in Video mode only.</summary>
+    public bool ShowVideoQuality => SelectedMode == DownloadMode.Video;
 
     public string? UpscaleWarning =>
         VideoInfo is not null
