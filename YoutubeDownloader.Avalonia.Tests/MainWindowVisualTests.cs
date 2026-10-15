@@ -1,15 +1,19 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Moq;
 using YoutubeDownloader.Avalonia.Services;
 using YoutubeDownloader.Avalonia.Views;
+using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
 using YoutubeDownloader.Core.ViewModels;
+using YoutubeExplode.Exceptions;
 using YoutubeExplode.Videos.Streams;
 
 namespace YoutubeDownloader.Avalonia.Tests;
@@ -36,6 +40,7 @@ public class MainWindowVisualTests
     private readonly Mock<IUpdateService> _updates = new();
     private readonly Mock<ISelfUpdater> _selfUpdater = new();
     private readonly Mock<IClipboardService> _clipboard = new();
+    private readonly Mock<IFolderPickerService> _folderPicker = new();
 
     public MainWindowVisualTests()
     {
@@ -225,7 +230,7 @@ public class MainWindowVisualTests
         Assert.Contains("Etanercept", texts);
         Assert.Contains("001", texts);
         Assert.Contains("12:16", texts);
-        Assert.DoesNotContain("MP3 QUALITY", texts);
+        Assert.Single(texts, t => t == "MP3 QUALITY");
         Assert.DoesNotContain("VIDEO QUALITY", texts);
         var checklist = Checklist(window);
         Assert.True(checklist.Bounds.Height >= 112, $"The checklist is {checklist.Bounds.Height} px tall; 4 rows need 112 px.");
@@ -282,12 +287,224 @@ public class MainWindowVisualTests
         Snapshot(window, "026a-clipboard-playlist");
     }
 
+    [AvaloniaFact]
+    public async Task QueueRunning_ShowsRowStatusProgressAndCancelAll()
+    {
+        var folder = NewScratchFolder();
+        try
+        {
+            // Item 1's stream reports half done and then runs until cancelled; item 2 is fetched ahead meanwhile.
+            SetupQueue(folder, (_, progress, ct) =>
+            {
+                progress?.Report(0.5);
+                return Task.Delay(Timeout.Infinite, ct);
+            });
+            var (window, vm, _) = Create();
+            await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), PharmacologyItems());
+
+            var run = vm.DownloadPlaylistCommand.ExecuteAsync(null);
+            Settle();
+
+            var texts = VisibleTexts(window);
+            Assert.Contains("Cancel all", texts);
+            Assert.Contains("Downloading…", texts);
+            Assert.Contains("Fetching…", texts);
+            Assert.DoesNotContain("Download 5", texts);
+            var checklist = Checklist(window);
+            var downloading = RowItem(checklist, 1);
+            var miniBar = downloading.GetVisualDescendants().OfType<ProgressBar>().Single();
+            Assert.True(miniBar.IsEffectivelyVisible);
+            Assert.Equal(60, miniBar.Bounds.Width);
+            Assert.Equal(0.5 * 2 / 3, miniBar.Value, 3);   // the stream download is the first two thirds of the pipeline
+            Assert.All(Enumerable.Range(1, 5), i => Assert.True(RemoveButton(RowItem(checklist, i)).IsEffectivelyVisible));
+            Assert.False(RowItem(checklist, 3).GetVisualDescendants().OfType<ProgressBar>().Single().IsEffectivelyVisible);
+            AssertDurationsAligned(checklist);
+            Snapshot(window, "026b-queue-running");
+
+            await vm.CancelAllCommand.ExecuteAsync(null);
+            await SettleUntilAsync(() => run.IsCompleted);
+            Assert.True(run.IsCompleted);
+            Assert.Equal("Cancelled. 0 of 5 saved · 5 cancelled", vm.StatusMessage);
+        }
+        finally
+        {
+            DeleteScratchFolder(folder);
+        }
+    }
+
+    /// <summary>Every final state in one checklist: saved, two failures (one too long for its cell), skipped and cancelled.</summary>
+    [AvaloniaFact]
+    public async Task QueueFinished_ShowsSummaryAndRetryFailed()
+    {
+        var folder = NewScratchFolder();
+        try
+        {
+            // Item 4 was saved here before, so the run skips it.
+            var items = PharmacologyItems();
+            var subFolder = OutputFileNamer.SubFolder(folder, "Pharmacology");
+            var savedEarlier = OutputFileNamer.Plan([new NamingEntry(4, items[3].Title, items[3].Author)], subFolder, "mp3", _ => false)[0];
+            Directory.CreateDirectory(subFolder);
+            File.WriteAllText(savedEarlier, "saved earlier");
+            _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+            {
+                new() { Url = items[3].Url, Title = items[3].Title, Format = "MP3 · VBR V0 (~245 kbps)", FilePath = savedEarlier, DownloadedAt = DateTimeOffset.Now }
+            });
+            // Items 2 and 3 fail at fetch; item 5 downloads until its ✕.
+            SetupQueue(folder,
+                (videoId, _, ct) => videoId == items[4].VideoId ? Task.Delay(Timeout.Infinite, ct) : Task.CompletedTask,
+                url => url == items[1].Url ? new VideoUnavailableException("Video is unavailable")
+                    : url == items[2].Url ? new VideoUnplayableException("Video is age-restricted")
+                    : null);
+            var (window, vm, _) = Create();
+            await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), items);
+
+            var run = vm.DownloadPlaylistCommand.ExecuteAsync(null);
+            Settle();
+            vm.RemoveQueueItemCommand.Execute(vm.Playlist!.Items[4]);
+            await SettleUntilAsync(() => run.IsCompleted);
+
+            Assert.True(run.IsCompleted);
+            var summary = "1 of 5 saved · 2 failed · 1 skipped · 1 cancelled";
+            Assert.Equal(summary, vm.StatusMessage);
+            var texts = VisibleTexts(window);
+            Assert.Contains(summary, texts);
+            Assert.Contains("✓ Saved", texts);
+            Assert.Contains("Unavailable (private or removed)", texts);
+            Assert.Contains("Already saved", texts);
+            Assert.Contains("Cancelled", texts);
+            Assert.Contains("Retry failed", texts);
+            Assert.Contains("Download 4", texts);
+            Assert.DoesNotContain("Cancel all", texts);
+
+            var checklist = Checklist(window);
+            var unplayable = StatusOf(RowItem(checklist, 3));
+            Assert.Equal("Can't be played (age-restricted or region-blocked)", unplayable.Text);
+            Assert.Contains(unplayable.TextLayout.TextLines, line => line.HasCollapsed);   // ends in an ellipsis…
+            Assert.Equal(unplayable.Text, ToolTip.GetTip(unplayable));                     // …and reads in full in the tooltip
+            Assert.Equal(Color.Parse("#FCA5A5"), ((ISolidColorBrush)unplayable.Foreground!).Color);
+            Assert.Equal(Color.Parse("#FCA5A5"), ((ISolidColorBrush)StatusOf(RowItem(checklist, 2)).Foreground!).Color);
+            Assert.Equal(Color.Parse("#B8B0D0"), ((ISolidColorBrush)StatusOf(RowItem(checklist, 1)).Foreground!).Color);
+            Assert.Null(ToolTip.GetTip(StatusOf(RowItem(checklist, 1))));
+            Assert.All(Enumerable.Range(1, 5), i => Assert.False(RemoveButton(RowItem(checklist, i)).IsEffectivelyVisible));
+            AssertDurationsAligned(checklist);
+            Snapshot(window, "026b-queue-finished");
+
+            // The last rows, the cancelled one in full.
+            checklist.ScrollIntoView(4);
+            Settle();
+            Assert.Equal("Cancelled", StatusOf(RowItem(checklist, 5)).Text);
+            AssertDurationsAligned(checklist);
+            Snapshot(window, "026b-queue-finished-scrolled");
+        }
+        finally
+        {
+            DeleteScratchFolder(folder);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task PlaylistOptions_VideoMode_ShowMaxVideoHeight()
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "Video" });
+        var (window, vm, _) = Create();
+
+        await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), PharmacologyItems());
+
+        var texts = VisibleTexts(window);
+        Assert.Contains("MAX VIDEO HEIGHT", texts);
+        Assert.Contains("1080p", texts);
+        Assert.Contains("SAVE TO", texts);
+        Assert.Contains("Chosen when you start", texts);
+        Assert.Contains("Sub-folder per playlist", texts);
+        Assert.Contains("Download 5", texts);
+        Assert.DoesNotContain("MP3 QUALITY", texts);
+        Assert.DoesNotContain("VIDEO QUALITY", texts);
+        var checklist = Checklist(window);
+        Assert.True(checklist.Bounds.Height >= 112, $"The checklist is {checklist.Bounds.Height} px tall; 4 rows need 112 px.");
+        Snapshot(window, "026b-options-video");
+    }
+
+    [AvaloniaFact]
+    public async Task LargeQueueRunning_HidesTheLongListWarning()
+    {
+        var folder = NewScratchFolder();
+        try
+        {
+            SetupQueue(folder, (_, progress, ct) =>
+            {
+                progress?.Report(0.25);
+                return Task.Delay(Timeout.Infinite, ct);
+            });
+            var (window, vm, _) = Create();
+            await FetchPlaylistAsync(vm, PharmacologyInfo(count: 302), LongItems(300));
+            const string warning = "300 videos: a list this long can take hours to download.";
+            Assert.Contains(warning, VisibleTexts(window));
+            var before = Checklist(window).Bounds.Height;
+
+            var run = vm.DownloadPlaylistCommand.ExecuteAsync(null);
+            Settle();
+
+            Assert.DoesNotContain(warning, VisibleTexts(window));
+            var after = Checklist(window).Bounds.Height;
+            Assert.True(after >= before + 30, $"The checklist grew from {before} to {after} px only.");   // the warning and its spacing
+            Assert.Contains("Cancel all", VisibleTexts(window));
+            AssertDurationsAligned(Checklist(window));
+            Snapshot(window, "026b-large-list-running");
+
+            await vm.StopQueueAsync(TimeSpan.FromSeconds(3));
+            await SettleUntilAsync(() => run.IsCompleted);
+            Assert.True(run.IsCompleted);
+        }
+        finally
+        {
+            DeleteScratchFolder(folder);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ClosingTheWindow_WhileTheQueueRuns_CancelsIt()
+    {
+        var folder = NewScratchFolder();
+        try
+        {
+            var tokens = new List<CancellationToken>();
+            SetupQueue(folder, (_, _, ct) =>
+            {
+                tokens.Add(ct);
+                return Task.Delay(Timeout.Infinite, ct);
+            });
+            var (window, vm, _) = Create();
+            await FetchPlaylistAsync(vm, PharmacologyInfo(count: 5), PharmacologyItems());
+            _ = vm.DownloadPlaylistCommand.ExecuteAsync(null);
+            Settle();
+            Assert.True(vm.IsQueueRunning);
+
+            window.Close();
+
+            // The close is held while the queue stops: the token is cancelled, the window still open.
+            Assert.True(Assert.Single(tokens).IsCancellationRequested);
+            Assert.True(window.IsVisible);
+            for (var i = 0; i < 50 && window.IsVisible; i++)
+            {
+                await Task.Delay(20);
+                Settle();
+            }
+
+            Assert.False(window.IsVisible);
+            Assert.False(vm.IsQueueRunning);
+        }
+        finally
+        {
+            DeleteScratchFolder(folder);
+        }
+    }
+
     private (MainWindow Window, MainViewModel Vm, UpdateViewModel Update) Create()
     {
         var vm = new MainViewModel(_youtube.Object, _ffmpeg.Object,
             new DownloadPipeline(_youtube.Object, _converter.Object, _temp.Object, Mock.Of<IOutputFileService>(), Mock.Of<IThumbnailFetcher>()),
             _saveFile.Object, _history.Object, Mock.Of<ILinkOpener>(), Mock.Of<IFileRevealer>(), _settings.Object,
-            _clipboard.Object, _confirm.Object, Mock.Of<IFoobar2000Launcher>());
+            _clipboard.Object, _confirm.Object, Mock.Of<IFoobar2000Launcher>(), _folderPicker.Object, Mock.Of<IRetryDelay>());
         var update = new UpdateViewModel(_updates.Object, Mock.Of<IFileRevealer>(), _selfUpdater.Object);
         var window = new MainWindow(vm, new AvaloniaClipboardService(), update);
         window.Show(); // raises Opened → the silent startup update check
@@ -347,6 +564,83 @@ public class MainWindowVisualTests
 
     private static ListBox Checklist(Window window) =>
         window.GetVisualDescendants().OfType<ListBox>().Single(list => list.Classes.Contains("checklist"));
+
+    private static ListBoxItem RowItem(ListBox checklist, int index) =>
+        checklist.GetVisualDescendants().OfType<ListBoxItem>()
+            .Single(item => item.DataContext is QueueItemViewModel row && row.Item.Index == index);
+
+    private static TextBlock StatusOf(ListBoxItem row) =>
+        row.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Classes.Contains("status"));
+
+    /// <summary>The row's ✕ (its CheckBox is a Button too).</summary>
+    private static Button RemoveButton(ListBoxItem row) =>
+        row.GetVisualDescendants().OfType<Button>().Single(button => button.Classes.Contains("chip"));
+
+    /// <summary>Every realized row's duration ends at the same x, whatever its status, mini bar or ✕ shows (026a review note).</summary>
+    private static void AssertDurationsAligned(ListBox checklist)
+    {
+        var rightEdges = checklist.GetVisualDescendants().OfType<ListBoxItem>()
+            .Select(item => item.GetVisualDescendants().OfType<TextBlock>().Single(t => Grid.GetColumn(t) == 3))
+            .Select(duration => duration.TranslatePoint(new Point(duration.Bounds.Width, 0), checklist)!.Value.X)
+            .ToList();
+        Assert.True(rightEdges.Count >= 3, $"Only {rightEdges.Count} rows are realized.");
+        Assert.All(rightEdges, x => Assert.Equal(rightEdges[0], x, 1));
+    }
+
+    /// <summary>A real folder for the queue (it checks and creates folders) under %TEMP%, never the repo.</summary>
+    private static string NewScratchFolder() =>
+        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "ytdl-visual", Guid.NewGuid().ToString("N"))).FullName;
+
+    private static void DeleteScratchFolder(string folder)
+    {
+        try
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+        catch (IOException)
+        {
+            // best-effort cleanup of the scratch folder
+        }
+    }
+
+    private readonly Dictionary<IStreamInfo, string> _streamVideoIds = new();
+
+    /// <summary>
+    /// Queue mocks: SAVE TO starts at <paramref name="folder"/>, FFmpeg is ready, a fetch answers unless
+    /// <paramref name="fetchError"/> gives an exception for its URL, and each stream download runs <paramref name="stream"/>
+    /// with the video id it belongs to. MP3 mode: the real pipeline then converts and commits through no-op mocks.
+    /// </summary>
+    private void SetupQueue(string folder, Func<string, IProgress<double>?, CancellationToken, Task> stream,
+        Func<string, Exception?>? fetchError = null)
+    {
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastSaveFolder = folder });
+        _ffmpeg.Setup(f => f.IsAvailable).Returns(true);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync("ffmpeg.exe");
+        _youtube.Setup(y => y.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns<string, CancellationToken>((url, _) => fetchError?.Invoke(url) is { } error
+                ? Task.FromException<VideoInfo>(error)
+                : Task.FromResult(QueueInfo(url)));
+        _youtube.Setup(y => y.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .Returns<IStreamInfo, string, IProgress<double>?, CancellationToken>((source, _, progress, ct) => stream(_streamVideoIds[source], progress, ct));
+    }
+
+    /// <summary>A fetched queue item: its own audio stream, so a stream download knows which item it serves.</summary>
+    private VideoInfo QueueInfo(string watchUrl)
+    {
+        var source = Mock.Of<IStreamInfo>();
+        _streamVideoIds[source] = watchUrl[^11..];
+        return SampleInfo() with { SourceUrl = watchUrl, BestAudio = new AudioStreamOption("opus", 128, "webm", source) };
+    }
+
+    /// <summary>Lets queued dispatcher work (cancellations, continuations) run until <paramref name="done"/>, 1 s at most.</summary>
+    private static async Task SettleUntilAsync(Func<bool> done)
+    {
+        for (var i = 0; i < 50 && !done(); i++)
+        {
+            await Task.Delay(20);
+            Settle();
+        }
+    }
 
     private static VideoInfo SampleInfo() => new(
         SourceUrl: VideoUrl,

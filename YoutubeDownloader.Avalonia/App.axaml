@@ -138,6 +138,14 @@
       <Setter Property="Background" Value="#14FFFFFF" />
     </Style>
 
+    <!-- Checklist status: secondary text; a failed item's reason in red (declared after, so it wins) -->
+    <Style Selector="TextBlock.status">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.failed">
+      <Setter Property="Foreground" Value="#FCA5A5" />
+    </Style>
+
     <!-- Accent progress bar -->
     <Style Selector="ProgressBar.accent">
       <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />

@@ -44,6 +44,9 @@ public sealed partial class PlaylistViewModel : ObservableObject
     public string Subtitle => string.Join(" · ", new[] { Info?.Author, CountText() }.Where(part => !string.IsNullOrEmpty(part)));
 
     public int SelectedCount => _selectedCount;
+
+    /// <summary>Ticked rows not saved yet: what "Download N" will run (Pending, Failed, Skipped or Cancelled).</summary>
+    public int RunnableCount => Items.Count(r => r.IsSelected && r.State is not ItemState.Saved);
     public string SelectAllText => $"Select all ({_selectedCount} of {Items.Count})";
 
     /// <summary>Two-way bound to the "Select all" checkbox.</summary>
@@ -60,7 +63,13 @@ public sealed partial class PlaylistViewModel : ObservableObject
             : $"{count - Items.Count} unavailable videos are hidden by YouTube"
         : null;
 
-    public string? LargeListWarning => Items.Count > LargeListThreshold
+    /// <summary>Set once a download run starts on this card: the long-list warning has done its job.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LargeListWarning))]
+    private bool _hasStartedRun;
+
+    /// <summary>Shown until the first run starts, which then gets the warning's room back for its rows.</summary>
+    public string? LargeListWarning => Items.Count > LargeListThreshold && !HasStartedRun
         ? $"{Items.Count} videos: a list this long can take hours to download."
         : null;
 
@@ -75,7 +84,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
             Items.Add(row);
             _selectedCount++;
         }
-        RaiseCounts();
+        RefreshCounts();
     }
 
     public void FinishLoading() => IsLoading = false;
@@ -104,7 +113,7 @@ public sealed partial class PlaylistViewModel : ObservableObject
         {
             _bulkSelecting = false;
         }
-        RaiseCounts();
+        RefreshCounts();
     }
 
     private void OnRowChanged(object? sender, PropertyChangedEventArgs e)
@@ -113,12 +122,14 @@ public sealed partial class PlaylistViewModel : ObservableObject
             return;
         _selectedCount += row.IsSelected ? 1 : -1;
         if (!_bulkSelecting)
-            RaiseCounts();
+            RefreshCounts();
     }
 
-    private void RaiseCounts()
+    /// <summary>Raises every count the card shows; the queue calls it when a run ends (row states changed).</summary>
+    public void RefreshCounts()
     {
         OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(RunnableCount));
         OnPropertyChanged(nameof(AllSelected));
         OnPropertyChanged(nameof(SelectAllText));
         OnPropertyChanged(nameof(Subtitle));
