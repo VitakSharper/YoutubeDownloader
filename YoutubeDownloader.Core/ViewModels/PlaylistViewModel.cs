@@ -63,7 +63,13 @@ public sealed partial class PlaylistViewModel : ObservableObject
             : $"{count - Items.Count} unavailable videos are hidden by YouTube"
         : null;
 
-    public string? LargeListWarning => Items.Count > LargeListThreshold
+    /// <summary>Set once a download run starts on this card: the long-list warning has done its job.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LargeListWarning))]
+    private bool _hasStartedRun;
+
+    /// <summary>Shown until the first run starts, which then gets the warning's room back for its rows.</summary>
+    public string? LargeListWarning => Items.Count > LargeListThreshold && !HasStartedRun
         ? $"{Items.Count} videos: a list this long can take hours to download."
         : null;
 

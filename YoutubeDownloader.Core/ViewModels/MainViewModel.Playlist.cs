@@ -287,6 +287,7 @@ public partial class MainViewModel
             var token = _queueCts.Token;
             IsBusy = true;
             IsQueueRunning = true;
+            playlist.HasStartedRun = true;
             DetectedClipboardUrl = null;   // its "Use it" would replace the card mid-run; CheckClipboard keeps it hidden while busy
             Progress = 0;
             _queueCounters = new QueueRunCounters { Total = rows.Count, Done = rows.Count - toRun.Count };

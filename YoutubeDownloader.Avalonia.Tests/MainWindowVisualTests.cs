@@ -226,7 +226,7 @@ public class MainWindowVisualTests
         Assert.Contains("Etanercept", texts);
         Assert.Contains("001", texts);
         Assert.Contains("12:16", texts);
-        Assert.DoesNotContain("MP3 QUALITY", texts);
+        Assert.Single(texts, t => t == "MP3 QUALITY");
         Assert.DoesNotContain("VIDEO QUALITY", texts);
         var checklist = Checklist(window);
         Assert.True(checklist.Bounds.Height >= 112, $"The checklist is {checklist.Bounds.Height} px tall; 4 rows need 112 px.");
