@@ -1,4 +1,5 @@
 using YoutubeExplode;
+using YoutubeExplode.Common;
 using YoutubeExplode.Videos.Streams;
 using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
@@ -44,7 +45,9 @@ public sealed class YoutubeExplodeService : IYouTubeService
             BestAudio: bestAudio,
             VideoOptions: videoOptions,
             BestOpusAudio: bestOpus,
-            BestMp4Audio: bestMp4Audio);
+            BestMp4Audio: bestMp4Audio,
+            UploadDate: video.UploadDate,
+            CoverArtUrl: video.Thumbnails.TryGetWithHighestResolution()?.Url);
     }
 
     public async Task DownloadStreamAsync(IStreamInfo stream, string filePath, IProgress<double>? progress, CancellationToken ct)
