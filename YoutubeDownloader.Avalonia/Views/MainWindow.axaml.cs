@@ -9,6 +9,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _vm;
     private readonly AvaloniaClipboardService _clipboard;
+    private bool _closingAfterQueueStop;
 
     public MainWindow() // designer ctor
     {
@@ -40,6 +41,18 @@ public partial class MainWindow : Window
         {
             await _clipboard.RefreshAsync();
             _vm.CheckClipboardCommand.Execute(null);
+        };
+
+        // 018 §7: closing mid-run must not leave .part and temp files behind. Hold the close, stop the queue
+        // (its items discard their files), then close for real; a queue that hangs gets 3 s at most.
+        Closing += async (_, e) =>
+        {
+            if (_closingAfterQueueStop || !_vm.IsQueueRunning)
+                return;
+            e.Cancel = true;
+            _closingAfterQueueStop = true;
+            await _vm.StopQueueAsync(TimeSpan.FromSeconds(3));
+            Close();
         };
     }
 }
