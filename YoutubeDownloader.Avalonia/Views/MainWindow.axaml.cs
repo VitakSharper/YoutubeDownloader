@@ -31,6 +31,9 @@ public partial class MainWindow : Window
         // but does NOT assign the strongly-typed code-behind fields (they stay null).
         this.FindControl<StackPanel>("UpdatePanel")!.DataContext = update;
 
+        // One silent update check per launch; it only speaks up when a newer release exists.
+        Opened += async (_, _) => await update.CheckSilentlyAsync();
+
         // Fires on first show (covers startup) and on every refocus.
         // Refresh the clipboard cache first, then let the VM inspect it.
         Activated += async (_, _) =>
