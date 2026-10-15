@@ -27,7 +27,8 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
         catch
         {
-            // Unreadable/corrupt settings fall back to defaults.
+            // Unreadable/corrupt settings: move them aside (never overwrite them) and fall back to defaults.
+            AtomicFile.Quarantine(_filePath);
             return new AppSettings();
         }
     }
@@ -35,6 +36,6 @@ public sealed class JsonSettingsStore : ISettingsStore
     public void Save(AppSettings settings)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-        File.WriteAllText(_filePath, JsonSerializer.Serialize(settings, Options));
+        AtomicFile.WriteAllText(_filePath, JsonSerializer.Serialize(settings, Options));
     }
 }

@@ -34,6 +34,30 @@ public class JsonSettingsStoreTests : IDisposable
         Assert.True(new JsonSettingsStore(_dir).Load().AlwaysOnTop);
     }
 
+    [Fact]
+    public void Save_LeavesNoTmpFileBehind()
+    {
+        var store = new JsonSettingsStore(_dir);
+
+        store.Save(new AppSettings { AlwaysOnTop = false });
+
+        Assert.True(File.Exists(Path.Combine(_dir, "settings.json")));
+        Assert.False(File.Exists(Path.Combine(_dir, "settings.json.tmp")));
+    }
+
+    [Fact]
+    public void Load_WhenCorrupt_KeepsCorruptCopy()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Path.Combine(_dir, "settings.json"), "not json");
+
+        new JsonSettingsStore(_dir).Load();
+
+        Assert.False(File.Exists(Path.Combine(_dir, "settings.json")));
+        var copy = Assert.Single(Directory.GetFiles(_dir, "settings.json.corrupt-*"));
+        Assert.Equal("not json", File.ReadAllText(copy));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_dir))

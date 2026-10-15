@@ -27,7 +27,8 @@ public sealed class JsonHistoryStore : IHistoryStore
         }
         catch
         {
-            // Unreadable/corrupt history must never crash the app — start empty.
+            // Unreadable/corrupt history: move it aside (never overwrite it) and start empty.
+            AtomicFile.Quarantine(_filePath);
             return new List<HistoryEntry>();
         }
     }
@@ -36,6 +37,6 @@ public sealed class JsonHistoryStore : IHistoryStore
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
         var json = JsonSerializer.Serialize(entries.ToList(), Options);
-        File.WriteAllText(_filePath, json);
+        AtomicFile.WriteAllText(_filePath, json);
     }
 }
