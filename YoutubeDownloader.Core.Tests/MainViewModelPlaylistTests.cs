@@ -321,4 +321,27 @@ public class MainViewModelPlaylistTests
         Assert.NotNull(vm.VideoInfo);
         Assert.True(vm.HasPlaylistChoice);
     }
+
+    [Fact]
+    public async Task Url_EditedWhileThatListsCardIsOpen_DoesNotBringTheChoiceBack()
+    {
+        SetupVideo(WatchUrl);
+        SetupPlaylist(2, [Item(1), Item(2)]);
+        var vm = CreateSut();
+        vm.Url = WatchInList;
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        await vm.ChooseWholePlaylistCommand.ExecuteAsync(null);
+        var card = vm.Playlist;
+
+        vm.Url = WatchInList + "&t=42";   // edited, still a video inside the same list
+
+        Assert.Same(card, vm.Playlist);
+        Assert.False(vm.HasPlaylistChoice);
+
+        vm.Url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL601B2E69B03FAB9D";   // another list
+
+        Assert.Null(vm.Playlist);
+        Assert.True(vm.HasPlaylistChoice);
+        Assert.Equal("PL601B2E69B03FAB9D", vm.PlaylistChoice!.ListId);
+    }
 }
