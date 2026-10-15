@@ -53,7 +53,8 @@ public partial class App : Application
         services.AddSingleton<IMediaConverter, FFmpegMediaConverter>();
         services.AddSingleton<ITempFileService, TempFileService>();
         services.AddSingleton<IThumbnailFetcher>(sp =>
-            new HttpThumbnailFetcher(new HttpClient(), sp.GetRequiredService<ITempFileService>()));
+            // Cover art is best-effort: a stalled thumbnail server must not hold the download for HttpClient's default 100 s.
+            new HttpThumbnailFetcher(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }, sp.GetRequiredService<ITempFileService>()));
         services.AddSingleton<IOutputFileService, OutputFileService>();
         services.AddSingleton<ISaveFileService, AvaloniaSaveFileService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
