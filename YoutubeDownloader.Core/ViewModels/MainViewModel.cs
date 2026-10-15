@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using YoutubeDownloader.Core.Helpers;
 using YoutubeDownloader.Core.Models;
 using YoutubeDownloader.Core.Services;
+using YoutubeExplode.Videos.Streams;
 
 namespace YoutubeDownloader.Core.ViewModels;
 
@@ -350,10 +351,17 @@ public partial class MainViewModel : ObservableObject
                 var tempAudio = _temp.NewTempFile(audio.Container);
                 tempFiles.Add(tempAudio);
 
-                await _youtube.DownloadStreamAsync(videoQuality.Source, tempVideo,
-                    new Progress<double>(p => Progress = 0.1 + p * 0.4), token);
-                await _youtube.DownloadStreamAsync(audio.Source, tempAudio,
-                    new Progress<double>(p => Progress = 0.5 + p * 0.2), token);
+                // Video and audio are independent streams: fetch both at once.
+                // Progress window 0.1–0.7 is shared, weighted 80% video / 20% audio.
+                var streams = new CombinedProgress(firstWeight: 0.8);
+                using (var streamsCts = CancellationTokenSource.CreateLinkedTokenSource(token))
+                {
+                    var videoTask = DownloadCancellingSiblingAsync(videoQuality.Source, tempVideo,
+                        new Progress<double>(p => Progress = 0.1 + streams.ReportFirst(p) * 0.6), streamsCts);
+                    var audioTask = DownloadCancellingSiblingAsync(audio.Source, tempAudio,
+                        new Progress<double>(p => Progress = 0.1 + streams.ReportSecond(p) * 0.6), streamsCts);
+                    await Task.WhenAll(videoTask, audioTask);
+                }
 
                 StatusMessage = "Merging video + audio…";
                 if (info.BestMp4Audio is not null)
@@ -402,6 +410,24 @@ public partial class MainViewModel : ObservableObject
     }
 
     private bool CanCancelDownload() => IsDownloading;
+
+    /// <summary>
+    /// Downloads one stream of a parallel pair. If it fails (or is cancelled), it cancels the
+    /// sibling download too, so no download keeps writing a temp file that cleanup is deleting.
+    /// </summary>
+    private async Task DownloadCancellingSiblingAsync(IStreamInfo source, string filePath,
+        IProgress<double> progress, CancellationTokenSource siblings)
+    {
+        try
+        {
+            await _youtube.DownloadStreamAsync(source, filePath, progress, siblings.Token);
+        }
+        catch
+        {
+            siblings.Cancel();
+            throw;
+        }
+    }
 
     private void RememberSaveFolder(string target)
     {
