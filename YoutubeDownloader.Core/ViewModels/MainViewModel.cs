@@ -345,7 +345,7 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = $"Converting to MP3 ({quality.Label})…";
-                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality,
+                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, null, null,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"MP3 · {quality.HistoryLabel}";
             }
@@ -358,7 +358,7 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = "Saving Opus audio…";
-                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part,
+                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part, null,
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"Opus · {info.BestOpusAudio.BitrateKbps} kbps";
             }

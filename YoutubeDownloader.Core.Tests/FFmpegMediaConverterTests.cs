@@ -12,7 +12,7 @@ public class FFmpegMediaConverterTests
         var missing = Path.Combine(Path.GetTempPath(), "definitely-not-ffmpeg-" + Guid.NewGuid().ToString("N") + ".exe");
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            converter.ConvertToMp3Async(missing, "in.webm", "out.mp3", Mp3Quality.Cbr192, TimeSpan.FromSeconds(10), null, CancellationToken.None));
+            converter.ConvertToMp3Async(missing, "in.webm", "out.mp3", Mp3Quality.Cbr192, null, null, TimeSpan.FromSeconds(10), null, CancellationToken.None));
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public class FFmpegMediaConverterTests
         var missing = Path.Combine(Path.GetTempPath(), "definitely-not-ffmpeg-" + Guid.NewGuid().ToString("N") + ".exe");
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            converter.RemuxToOpusAsync(missing, "in.webm", "out.opus", TimeSpan.FromSeconds(10), null, CancellationToken.None));
+            converter.RemuxToOpusAsync(missing, "in.webm", "out.opus", null, TimeSpan.FromSeconds(10), null, CancellationToken.None));
     }
 
     [Fact]

@@ -147,7 +147,7 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(
-            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.Cbr256,
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.Cbr256, It.IsAny<MediaTags?>(), It.IsAny<string?>(),
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.False(vm.IsBusy);
     }
@@ -395,7 +395,7 @@ public class MainViewModelTests
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
         _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
         _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
 
         var vm = CreateSut();
@@ -449,7 +449,7 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Single(vm.History);
     }
 
@@ -585,7 +585,7 @@ public class MainViewModelTests
 
         Assert.Equal("https://youtu.be/dQw4w9WgXcQ", Assert.Single(vm.History).Url);
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -1148,9 +1148,9 @@ public class MainViewModelTests
 
         // Must honor the mode captured at start (MP3), not the flipped-to Opus (which would NPE on the null BestOpusAudio).
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _converter.Verify(c => c.RemuxToOpusAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<MediaTags?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -1190,7 +1190,7 @@ public class MainViewModelTests
         await vm.DownloadCommand.ExecuteAsync(null);
 
         _converter.Verify(c => c.ConvertToMp3Async(
-            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.BestVbr,
+            @"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.mp3", Mp3Quality.BestVbr, It.IsAny<MediaTags?>(), It.IsAny<string?>(),
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal("MP3 · VBR V0 (~245 kbps)", Assert.Single(vm.History).Format);
     }
@@ -1212,10 +1212,10 @@ public class MainViewModelTests
 
         await vm.DownloadCommand.ExecuteAsync(null);
 
-        _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.opus",
+        _converter.Verify(c => c.RemuxToOpusAsync(@"C:\ffmpeg\ffmpeg.exe", @"C:\temp\a.webm", @"C:\out\song.part.opus", It.IsAny<MediaTags?>(),
             info.Duration, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Equal("Opus · 160 kbps", Assert.Single(vm.History).Format);
     }
 
@@ -1393,7 +1393,7 @@ public class MainViewModelTests
         _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
         _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), "mp3", It.IsAny<string?>())).ReturnsAsync(@"C:\out\song.mp3");
         _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<Mp3Quality>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<Mp3Quality>(), It.IsAny<MediaTags?>(), It.IsAny<string?>(), It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("ffmpeg boom"));
 
         var vm = CreateSut();
