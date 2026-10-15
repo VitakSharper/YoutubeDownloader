@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using Avalonia;
@@ -16,7 +15,15 @@ namespace YoutubeDownloader.Avalonia.Imaging;
 public static class AsyncImage
 {
     private static readonly HttpClient Http = new();
-    private static readonly ConcurrentDictionary<string, Bitmap> Cache = new();
+
+    /// <summary>Decode width: 2× the 120 px thumbnail box in MainWindow.axaml (sharp up to 200% DPI).</summary>
+    private const int DecodeWidth = 240;
+
+    // Only the most recent image is kept: the UI shows one thumbnail at a time, and the old
+    // dictionary grew by one full-size bitmap per fetched video. Touched only from OnChanged,
+    // which runs and resumes on the UI thread, so no locking is needed.
+    private static string? _lastUrl;
+    private static Bitmap? _lastBitmap;
 
     public static readonly AttachedProperty<string?> SourceUrlProperty =
         AvaloniaProperty.RegisterAttached<Image, string?>("SourceUrl", typeof(AsyncImage));
@@ -35,16 +42,20 @@ public static class AsyncImage
 
         try
         {
-            if (Cache.TryGetValue(url, out var cached))
+            if (url == _lastUrl && _lastBitmap is not null)
             {
-                image.Source = cached;
+                image.Source = _lastBitmap;
                 return;
             }
 
             var bytes = await Http.GetByteArrayAsync(url);
             using var ms = new MemoryStream(bytes);
-            var bitmap = new Bitmap(ms);
-            Cache[url] = bitmap;
+            var bitmap = Bitmap.DecodeToWidth(ms, DecodeWidth);
+
+            // The previous bitmap is not disposed here: an Image may still be showing it.
+            // Once nothing references it, it is reclaimed by the GC.
+            _lastUrl = url;
+            _lastBitmap = bitmap;
 
             // The Avalonia sync context returns us to the UI thread; guard against a stale URL.
             if (GetSourceUrl(image) == url)
