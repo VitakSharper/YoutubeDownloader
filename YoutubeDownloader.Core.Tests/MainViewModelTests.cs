@@ -22,6 +22,7 @@ public class MainViewModelTests
     private readonly Mock<IConfirmationService> _confirm = new();
     private readonly Mock<IFoobar2000Launcher> _foobar = new();
     private readonly Mock<IOutputFileService> _output = new();
+    private readonly Mock<IThumbnailFetcher> _thumbnails = new();
 
     public MainViewModelTests()
     {
@@ -33,7 +34,7 @@ public class MainViewModelTests
     private MainViewModel CreateSut() =>
         new(_youtube.Object, _ffmpeg.Object, _converter.Object, _saveFile.Object, _temp.Object,
             _history.Object, _linkOpener.Object, _fileRevealer.Object, _settings.Object, _clipboard.Object,
-            _confirm.Object, _foobar.Object, _output.Object);
+            _confirm.Object, _foobar.Object, _output.Object, _thumbnails.Object);
 
     private static readonly IStreamInfo AacSource = Mock.Of<IStreamInfo>();
 
@@ -1427,5 +1428,90 @@ public class MainViewModelTests
         Assert.Contains("locked", vm.StatusMessage);
         Assert.Empty(vm.History);
         _output.Verify(o => o.Discard(@"C:\out\song.part.mp3"), Times.Once);
+    }
+
+    private const string CoverArtUrl = "https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/maxresdefault.webp";
+
+    private async Task<MainViewModel> FetchAndDownloadAsync(VideoInfo info, DownloadMode mode)
+    {
+        var ext = mode == DownloadMode.AudioOpus ? "opus" : "mp3";
+        _youtube.Setup(s => s.GetVideoInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(info);
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        _temp.Setup(t => t.NewTempFile(It.IsAny<string>())).Returns(@"C:\temp\a.webm");
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), ext, It.IsAny<string?>())).ReturnsAsync($@"C:\out\song.{ext}");
+
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        vm.SelectedMode = mode;
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+        return vm;
+    }
+
+    [Fact]
+    public async Task Download_Mp3_PassesTagsAndCoverToConverter()
+    {
+        var info = SampleInfo() with { UploadDate = new DateTimeOffset(2009, 10, 25, 0, 0, 0, TimeSpan.Zero), CoverArtUrl = CoverArtUrl };
+        _thumbnails.Setup(t => t.TryDownloadAsync(CoverArtUrl, It.IsAny<CancellationToken>())).ReturnsAsync(@"C:\temp\cover.jpg");
+
+        var vm = await FetchAndDownloadAsync(info, DownloadMode.AudioMp3);
+
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Mp3Quality>(),
+            It.Is<MediaTags?>(t => t!.Title == "Test Video" && t.Artist == "Tester"
+                && t.SourceUrl == "https://youtu.be/dQw4w9WgXcQ" && t.Year == 2009),
+            @"C:\temp\cover.jpg",
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(vm.History);
+    }
+
+    [Fact]
+    public async Task Download_Mp3_NoCoverAvailable_ConvertsWithNullCover()
+    {
+        _thumbnails.Setup(t => t.TryDownloadAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+
+        var vm = await FetchAndDownloadAsync(SampleInfo(), DownloadMode.AudioMp3);
+
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Mp3Quality>(),
+            It.Is<MediaTags?>(t => t != null && t.Year == null), null,
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(vm.History);
+    }
+
+    [Fact]
+    public async Task Download_Mp3_ConversionWithCoverFails_RetriesWithoutCover()
+    {
+        _thumbnails.Setup(t => t.TryDownloadAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(@"C:\temp\cover.jpg");
+        _converter.Setup(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Mp3Quality>(),
+                It.IsAny<MediaTags?>(), @"C:\temp\cover.jpg",
+                It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("FFmpeg exited with code 1: bad cover"));
+
+        var vm = await FetchAndDownloadAsync(SampleInfo(), DownloadMode.AudioMp3);
+
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Mp3Quality>(),
+            It.IsAny<MediaTags?>(), @"C:\temp\cover.jpg",
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _converter.Verify(c => c.ConvertToMp3Async(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Mp3Quality>(),
+            It.Is<MediaTags?>(t => t != null), null,
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(vm.History);
+        Assert.StartsWith("Done!", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Download_Opus_PassesTags()
+    {
+        var info = SampleInfo() with { UploadDate = new DateTimeOffset(2009, 10, 25, 0, 0, 0, TimeSpan.Zero), CoverArtUrl = CoverArtUrl };
+
+        var vm = await FetchAndDownloadAsync(info, DownloadMode.AudioOpus);
+
+        _converter.Verify(c => c.RemuxToOpusAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.Is<MediaTags?>(t => t!.Title == "Test Video" && t.Artist == "Tester"
+                && t.SourceUrl == "https://youtu.be/dQw4w9WgXcQ" && t.Year == 2009),
+            It.IsAny<TimeSpan>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _thumbnails.Verify(t => t.TryDownloadAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never); // no Opus cover
+        Assert.Single(vm.History);
     }
 }

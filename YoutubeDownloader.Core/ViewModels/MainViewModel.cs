@@ -26,12 +26,14 @@ public partial class MainViewModel : ObservableObject
     private readonly IConfirmationService _confirm;
     private readonly IFoobar2000Launcher _foobar;
     private readonly IOutputFileService _output;
+    private readonly IThumbnailFetcher _thumbnails;
     private readonly AppSettings _appSettings;
 
     public MainViewModel(IYouTubeService youtube, IFFmpegLocator ffmpeg, IMediaConverter converter,
         ISaveFileService saveFile, ITempFileService temp, IHistoryStore history, ILinkOpener linkOpener,
         IFileRevealer fileRevealer, ISettingsStore settings, IClipboardService clipboard,
-        IConfirmationService confirm, IFoobar2000Launcher foobar, IOutputFileService output)
+        IConfirmationService confirm, IFoobar2000Launcher foobar, IOutputFileService output,
+        IThumbnailFetcher thumbnails)
     {
         _youtube = youtube;
         _ffmpeg = ffmpeg;
@@ -46,6 +48,7 @@ public partial class MainViewModel : ObservableObject
         _confirm = confirm;
         _foobar = foobar;
         _output = output;
+        _thumbnails = thumbnails;
 
         _appSettings = _settings.Load();
         _alwaysOnTop = _appSettings.AlwaysOnTop;
@@ -344,9 +347,24 @@ public partial class MainViewModel : ObservableObject
                 await _youtube.DownloadStreamAsync(info.BestAudio.Source, tempAudio,
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
+                var tags = BuildTags(info);
+                var cover = await _thumbnails.TryDownloadAsync(info.CoverArtUrl ?? info.ThumbnailUrl, token);
+                if (cover is not null)
+                    tempFiles.Add(cover);
+
                 StatusMessage = $"Converting to MP3 ({quality.Label})…";
-                await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, null, null,
-                    info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
+                var convertProgress = new Progress<double>(p => Progress = 0.7 + p * 0.3);
+                try
+                {
+                    await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, tags, cover,
+                        info.Duration, convertProgress, token);
+                }
+                catch (Exception ex) when (cover is not null && ex is not OperationCanceledException && !token.IsCancellationRequested)
+                {
+                    // Cover art is best-effort: an image FFmpeg can't use must not cost the download.
+                    await _converter.ConvertToMp3Async(ffmpegPath, tempAudio, part, quality, tags, null,
+                        info.Duration, convertProgress, token);
+                }
                 formatLabel = $"MP3 · {quality.HistoryLabel}";
             }
             else if (mode == DownloadMode.AudioOpus)
@@ -358,7 +376,7 @@ public partial class MainViewModel : ObservableObject
                     new Progress<double>(p => Progress = 0.1 + p * 0.6), token);
 
                 StatusMessage = "Saving Opus audio…";
-                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part, null,
+                await _converter.RemuxToOpusAsync(ffmpegPath, tempAudio, part, BuildTags(info),
                     info.Duration, new Progress<double>(p => Progress = 0.7 + p * 0.3), token);
                 formatLabel = $"Opus · {info.BestOpusAudio.BitrateKbps} kbps";
             }
@@ -450,6 +468,10 @@ public partial class MainViewModel : ObservableObject
             throw;
         }
     }
+
+    /// <summary>Tags written into MP3/Opus files; the source URL is the one recorded in history.</summary>
+    private static MediaTags BuildTags(VideoInfo info)
+        => new(info.Title, info.Author, info.SourceUrl, info.UploadDate is { Year: > 1900 } d ? d.Year : null);
 
     private void RememberSaveFolder(string target)
     {
