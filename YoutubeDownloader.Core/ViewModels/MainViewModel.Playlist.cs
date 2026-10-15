@@ -287,6 +287,7 @@ public partial class MainViewModel
 
         try
         {
+            _queueRunId = Guid.NewGuid().ToString("N");   // one per run: a "Retry failed" gets its own History sub-header
             _queueCts = new CancellationTokenSource();
             var token = _queueCts.Token;
             IsBusy = true;
@@ -334,6 +335,7 @@ public partial class MainViewModel
             _queueCts = null;
             HasRetryableItems = playlist.Items.Any(r => r.State is ItemState.Failed or ItemState.Cancelled);
             playlist.RefreshCounts();
+            FlushHistory();   // the run's last entries (fewer than HistoryFlushEvery)
         }
     }
 
@@ -401,11 +403,72 @@ public partial class MainViewModel
                 break;
             case ItemState.Saved saved:
                 counters.Saved++;
-                RecordHistory(item.Url, item.Title, saved.FormatLabel, saved.Path);   // one entry per item, canonical watch URL (018 §8)
+                // One entry per item, canonical watch URL (018 §8), tagged with its run for the History tab.
+                RecordQueueHistory(new HistoryEntry
+                {
+                    Url = item.Url,
+                    Title = item.Title,
+                    Format = saved.FormatLabel,
+                    FilePath = saved.Path,
+                    DownloadedAt = DateTimeOffset.Now,
+                    VideoId = item.VideoId,
+                    PlaylistId = Playlist!.ListId,
+                    PlaylistTitle = Playlist.Title,
+                    RunId = _queueRunId,
+                    TrackIndex = item.Index
+                });
                 break;
         }
 
         // The single download's windows: 0-10 % FFmpeg, then the items done plus the current item's fraction.
         Progress = 0.1 + 0.9 * Math.Min(1.0, (counters.Done + counters.CurrentFraction) / counters.Total);
+    }
+
+    /// <summary>Queue entries are regrouped and saved once per this many, at the end of the run, and when the History tab is opened.</summary>
+    internal const int HistoryFlushEvery = 10;
+
+    /// <summary>Set at the start of each run; groups that run's entries under one History sub-header.</summary>
+    private string? _queueRunId;
+
+    private bool _deferHistoryGroups;
+    private int _unflushedQueueEntries;
+
+    /// <summary>
+    /// Adds one queue entry without regrouping the History tab or rewriting history.json each time (018 §8).
+    /// Deterministic on purpose: no SynchronizationContext post (xUnit 2's async test context posts to the
+    /// thread pool, which would race with the view model in the queue tests).
+    /// </summary>
+    internal void RecordQueueHistory(HistoryEntry entry)
+    {
+        _deferHistoryGroups = true;
+        try
+        {
+            History.Insert(0, entry);
+            TrimHistory();
+        }
+        finally
+        {
+            _deferHistoryGroups = false;
+        }
+        if (++_unflushedQueueEntries >= HistoryFlushEvery || SelectedTabIndex == 1)
+            FlushHistory();
+    }
+
+    /// <summary>Regroups and saves the queue entries recorded since the last flush; does nothing when there are none.</summary>
+    private void FlushHistory()
+    {
+        if (_unflushedQueueEntries == 0)
+            return;
+        _unflushedQueueEntries = 0;
+        RebuildHistoryGroups();
+        if (TrySaveHistory() is { } error)
+            StatusMessage = $"Couldn't save history: {error}";
+    }
+
+    /// <summary>Opening the History tab during a run shows the entries saved so far.</summary>
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (value == 1)
+            FlushHistory();
     }
 }

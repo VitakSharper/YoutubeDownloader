@@ -195,6 +195,90 @@ public class MainWindowVisualTests
     }
 
     /// <summary>
+    /// Plan 027b: a playlist run's entries sit under one collapsible sub-header in their date group, between
+    /// single downloads; it starts collapsed, expands from the row or the control, and a search opens it.
+    /// </summary>
+    [AvaloniaFact]
+    public void History_RunEntries_ShowACollapsibleSubHeader()
+    {
+        const string header = "'80s Sing-Alongs — 3 saved";
+        string[] runTitles = ["Take On Me", "Total Eclipse of the Heart", "Don't Stop Believin'"];
+        var today = DateTime.Today;
+        _history.Setup(h => h.Load()).Returns(new List<HistoryEntry>
+        {
+            new() { Url = VideoUrl, Title = "Me at the zoo", Format = "MP3 · VBR V0 (~245 kbps)", FilePath = @"C:\Music\Me at the zoo.mp3", DownloadedAt = today.AddHours(21) },
+            RunEntry(3, runTitles[0], today.AddHours(20).AddMinutes(14)),
+            RunEntry(2, runTitles[1], today.AddHours(20).AddMinutes(9)),
+            RunEntry(1, runTitles[2], today.AddHours(20).AddMinutes(4)),
+            new() { Url = "https://www.youtube.com/watch?v=9bZkp7q19f0", Title = "Gangnam Style", Format = "MP4 · 1080p", DownloadedAt = today.AddHours(19) }
+        });
+        var (window, vm, _) = Create();
+
+        vm.SelectedTabIndex = 1;
+        Settle();
+
+        var texts = VisibleTexts(window);
+        Assert.Contains("Today", texts);
+        Assert.Contains(header, texts);
+        Assert.Contains("Me at the zoo", texts);
+        Assert.Contains("Gangnam Style", texts);
+        Assert.All(runTitles, title => Assert.DoesNotContain(title, texts));
+        var expander = window.GetVisualDescendants().OfType<Expander>().Single();
+        Assert.False(expander.IsExpanded);
+        Snapshot(window, "027b-history-collapsed");
+
+        // Expanding the row (as a regrouping would restore it) opens the control; the cards are the single entries' cards.
+        var run = Assert.IsType<HistoryRunRow>(vm.HistoryGroups.Single().Rows[1]);
+        run.IsExpanded = true;
+        Settle();
+
+        Assert.True(expander.IsExpanded);
+        texts = VisibleTexts(window);
+        Assert.All(runTitles, title => Assert.Contains(title, texts));
+        Assert.Contains(header, texts);
+        var useButtons = expander.GetVisualDescendants().OfType<Button>().Where(b => Equals(b.Content, "Use")).ToList();
+        Assert.Equal(3, useButtons.Count);
+        Assert.All(useButtons, b => Assert.Same(vm.UseEntryCommand, b.Command));
+        Snapshot(window, "027b-history-expanded");
+
+        // Collapsing the control writes back to the row.
+        expander.IsExpanded = false;
+        Settle();
+        Assert.False(run.IsExpanded);
+        Assert.All(runTitles, title => Assert.DoesNotContain(title, VisibleTexts(window)));
+
+        // A search opens every matching run without remembering it: clearing the search folds it again.
+        vm.SearchText = "watch";
+        Settle();
+        texts = VisibleTexts(window);
+        Assert.Contains(header, texts);
+        Assert.All(runTitles, title => Assert.Contains(title, texts));
+        Assert.Contains("Gangnam Style", texts);
+        Assert.DoesNotContain("Me at the zoo", texts);
+        Snapshot(window, "027b-history-search");
+
+        vm.SearchText = "";
+        Settle();
+        texts = VisibleTexts(window);
+        Assert.Contains(header, texts);
+        Assert.All(runTitles, title => Assert.DoesNotContain(title, texts));
+    }
+
+    private static HistoryEntry RunEntry(int track, string title, DateTime downloadedAt) => new()
+    {
+        Url = PlaylistMapping.WatchUrl($"vid{track:D8}"),
+        Title = title,
+        Format = "MP3 · VBR V0 (~245 kbps)",
+        FilePath = $@"C:\Music\'80s Sing-Alongs\{track:D3}. {title}.mp3",
+        DownloadedAt = downloadedAt,
+        VideoId = $"vid{track:D8}",
+        PlaylistId = "PL601B2E69B03FAB9D",
+        PlaylistTitle = "'80s Sing-Alongs",
+        RunId = "0123456789abcdef0123456789abcdef",
+        TrackIndex = track
+    };
+
+    /// <summary>
     /// Needs the network (fetches a real YouTube thumbnail through AsyncImage), so it only runs when
     /// asked for explicitly. Checks plan 011's small thumbnail still fills the 120×68 box cleanly.
     /// </summary>

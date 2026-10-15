@@ -11,7 +11,7 @@ namespace YoutubeDownloader.Core.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
-    private const int MaxHistory = 100;
+    private const int MaxHistory = 1000;   // maintainer answer 4 (018 §8): one ordinary playlist no longer evicts everything
 
     private readonly IYouTubeService _youtube;
     private readonly IFFmpegLocator _ffmpeg;
@@ -57,7 +57,11 @@ public partial class MainViewModel : ObservableObject
         foreach (var entry in _history.Load())
             History.Add(entry);
 
-        History.CollectionChanged += (_, _) => RebuildHistoryGroups();
+        History.CollectionChanged += (_, _) =>
+        {
+            if (!_deferHistoryGroups)   // a playlist run regroups once per batch (RecordQueueHistory)
+                RebuildHistoryGroups();
+        };
         RebuildHistoryGroups();
     }
 
@@ -66,6 +70,9 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>History filtered by <see cref="SearchText"/> and bucketed by date, for the UI.</summary>
     public ObservableCollection<HistoryGroup> HistoryGroups { get; } = new();
+
+    /// <summary>The playlist runs the user expanded in the History tab, so a regrouping keeps them open.</summary>
+    private readonly HashSet<string> _expandedRuns = new(StringComparer.Ordinal);
 
     public string? HistoryPlaceholder =>
         HistoryGroups.Count > 0
@@ -85,9 +92,14 @@ public partial class MainViewModel : ObservableObject
                 e.Url.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         var today = DateOnly.FromDateTime(DateTime.Now);
+        var searching = !string.IsNullOrEmpty(search);   // a search shows every matching run's entries
         var grouped = entries
             .GroupBy(e => DateOnly.FromDateTime(e.DownloadedAt.LocalDateTime))
-            .Select(g => new HistoryGroup(HistoryDateLabel.For(g.Key, today), g.ToList()));
+            .Select(g =>
+            {
+                var list = g.ToList();
+                return new HistoryGroup(HistoryDateLabel.For(g.Key, today), list, HistoryRows.Build(list, _expandedRuns, forceExpanded: searching));
+            });
 
         HistoryGroups.Clear();
         foreach (var group in grouped)
@@ -516,10 +528,16 @@ public partial class MainViewModel : ObservableObject
             FilePath = filePath,
             DownloadedAt = DateTimeOffset.Now
         });
-        while (History.Count > MaxHistory)
-            History.RemoveAt(History.Count - 1);
+        TrimHistory();
         if (TrySaveHistory() is { } error)
             StatusMessage = $"Done! Saved to {filePath} — but history couldn't be saved: {error}";
+    }
+
+    /// <summary>Drops the oldest entries beyond <see cref="MaxHistory"/>.</summary>
+    private void TrimHistory()
+    {
+        while (History.Count > MaxHistory)
+            History.RemoveAt(History.Count - 1);
     }
 
     /// <summary>Re-load a past link into the URL box, switch to the Download tab, and fetch it.</summary>

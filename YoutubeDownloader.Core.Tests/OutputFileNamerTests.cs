@@ -128,6 +128,16 @@ public class OutputFileNamerTests
     }
 
     [Fact]
+    public void AlreadySaved_UsesTheVideoIdFieldWhenPresent()
+    {
+        var history = new[] { new HistoryEntry { Url = "", VideoId = "dQw4w9WgXcQ", FilePath = @"C:\Music\Mix\001. A - B.mp3" } };
+
+        var ids = OutputFileNamer.AlreadySavedVideoIds(history, Folder, "mp3", _ => true);
+
+        Assert.Equal("dQw4w9WgXcQ", Assert.Single(ids));
+    }
+
+    [Fact]
     public void SubFolder_IsTheSanitizedTitleUnderTheParent()
     {
         Assert.Equal(@"C:\Music\'80s_ Sing-Alongs_", OutputFileNamer.SubFolder(@"C:\Music", "'80s: Sing-Alongs?"));

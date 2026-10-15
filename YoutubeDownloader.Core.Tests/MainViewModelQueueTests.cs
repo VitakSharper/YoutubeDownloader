@@ -265,8 +265,78 @@ public class MainViewModelQueueTests : IDisposable
             Assert.Equal(Mp3Label, entry.Format);
             Assert.Equal(Target(i, SubFolder), entry.FilePath);
         }
-        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Exactly(3));
+        _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), Times.Once);   // plan 027b: coalesced, flushed when the run ends
     }
+
+    [Fact]
+    public async Task History_KeepsUpToOneThousandEntries()
+    {
+        _storedHistory.AddRange(Enumerable.Range(1, 1000).Select(i => new HistoryEntry
+        {
+            Url = $"https://youtu.be/old{i:D7}", Title = $"Old {i}", DownloadedAt = DateTimeOffset.Now.AddDays(-1).AddSeconds(-i)
+        }));
+        var vm = await LoadedPlaylistAsync(count: 1);
+        Assert.Equal(1000, vm.History.Count);
+
+        await vm.DownloadPlaylistCommand.ExecuteAsync(null).WaitAsync(Guard);
+
+        Assert.Equal(1000, vm.History.Count);
+        Assert.Equal("Title 1", vm.History[0].Title);
+        Assert.Equal("Old 999", vm.History[^1].Title);   // the oldest one made room
+    }
+
+    [Fact]
+    public async Task QueueRun_FillsTheRunFieldsOnEveryEntry()
+    {
+        var vm = await LoadedPlaylistAsync();
+
+        await vm.DownloadPlaylistCommand.ExecuteAsync(null).WaitAsync(Guard);
+
+        Assert.Equal(3, vm.History.Count);
+        var runId = vm.History[0].RunId;
+        Assert.False(string.IsNullOrEmpty(runId));
+        foreach (var i in new[] { 1, 2, 3 })
+        {
+            var entry = Assert.Single(vm.History, e => e.Title == $"Title {i}");
+            Assert.Equal(runId, entry.RunId);
+            Assert.Equal(Item(i).VideoId, entry.VideoId);
+            Assert.Equal(ListId, entry.PlaylistId);
+            Assert.Equal("Pharmacology", entry.PlaylistTitle);
+            Assert.Equal(i, entry.TrackIndex);
+        }
+        var run = Assert.IsType<HistoryRunRow>(Assert.Single(Assert.Single(vm.HistoryGroups).Rows));
+        Assert.Equal("Pharmacology — 3 saved", run.Header);
+    }
+
+    [Fact]
+    public void RecordQueueHistory_SavesOncePerTenEntriesAndWhenHistoryIsOpened()
+    {
+        var vm = CreateSut();
+        var entries = Enumerable.Range(1, MainViewModel.HistoryFlushEvery + 1)
+            .Select(i => new HistoryEntry { Url = Item(i).Url, Title = $"Title {i}", DownloadedAt = DateTimeOffset.Now, RunId = "run" })
+            .ToList();
+
+        foreach (var entry in entries.Take(MainViewModel.HistoryFlushEvery - 1))
+            vm.RecordQueueHistory(entry);
+
+        VerifySaved(Times.Never());
+        Assert.Empty(vm.HistoryGroups);
+        Assert.Equal(MainViewModel.HistoryFlushEvery - 1, vm.History.Count);
+
+        vm.RecordQueueHistory(entries[MainViewModel.HistoryFlushEvery - 1]);
+
+        VerifySaved(Times.Once());
+        Assert.Equal(MainViewModel.HistoryFlushEvery, Assert.Single(vm.HistoryGroups).Entries.Count);
+
+        vm.RecordQueueHistory(entries[MainViewModel.HistoryFlushEvery]);
+        VerifySaved(Times.Once());
+        vm.SelectedTabIndex = 1;
+
+        VerifySaved(Times.Exactly(2));
+        Assert.Equal(MainViewModel.HistoryFlushEvery + 1, Assert.Single(vm.HistoryGroups).Entries.Count);
+    }
+
+    private void VerifySaved(Times times) => _history.Verify(h => h.Save(It.IsAny<IEnumerable<HistoryEntry>>()), times);
 
     [Fact]
     public async Task DownloadPlaylist_ItemAlreadySavedHere_IsSkipped()
