@@ -36,4 +36,25 @@ public class Mp3QualityTests
     {
         Assert.Equal("Best (VBR V0)", Mp3Quality.BestVbr.ToString());
     }
+
+    [Fact]
+    public void Keys_AreStableAndUnique()
+    {
+        Assert.Equal(new[] { "vbr-v0", "cbr-320", "cbr-256", "cbr-192", "cbr-128" }, Mp3Quality.All.Select(q => q.Key));
+    }
+
+    [Fact]
+    public void FromKey_RoundTripsEveryPreset()
+    {
+        foreach (var q in Mp3Quality.All)
+            Assert.Same(q, Mp3Quality.FromKey(q.Key));
+    }
+
+    [Fact]
+    public void FromKey_UnknownOrEmpty_ReturnsBestVbr()
+    {
+        Assert.Same(Mp3Quality.BestVbr, Mp3Quality.FromKey(null));
+        Assert.Same(Mp3Quality.BestVbr, Mp3Quality.FromKey(""));
+        Assert.Same(Mp3Quality.BestVbr, Mp3Quality.FromKey("cbr-999"));
+    }
 }
