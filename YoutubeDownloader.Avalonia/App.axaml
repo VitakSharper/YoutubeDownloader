@@ -126,6 +126,18 @@
       <Setter Property="Background" Value="#2EFFFFFF" />
     </Style>
 
+    <!-- Playlist checklist: compact rows, no selection highlight (the checkbox is the selection) -->
+    <Style Selector="ListBox.checklist ListBoxItem">
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.checklist ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.checklist ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#14FFFFFF" />
+    </Style>
+
     <!-- Accent progress bar -->
     <Style Selector="ProgressBar.accent">
       <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
