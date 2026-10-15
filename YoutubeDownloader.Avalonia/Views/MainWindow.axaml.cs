@@ -35,6 +35,14 @@ public partial class MainWindow : Window
         // One silent update check per launch; it only speaks up when a newer release exists.
         Opened += async (_, _) => await update.CheckSilentlyAsync();
 
+        // Installing an update restarts the app: hold it while a video or a playlist is downloading.
+        update.IsAppDownloading = vm.IsAnyDownloadActive;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsAnyDownloadActive))
+                update.IsAppDownloading = vm.IsAnyDownloadActive;
+        };
+
         // Fires on first show (covers startup) and on every refocus.
         // Refresh the clipboard cache first, then let the VM inspect it.
         Activated += async (_, _) =>

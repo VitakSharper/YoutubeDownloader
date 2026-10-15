@@ -86,7 +86,8 @@
                     Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding !IsBusy}" />
             <Button Classes="chip" Content="Download"
                     Command="{Binding DownloadUpdateCommand}"
-                    IsVisible="{Binding IsUpdateAvailable}" IsEnabled="{Binding !IsBusy}" />
+                    IsVisible="{Binding IsUpdateAvailable}" IsEnabled="{Binding CanStartUpdateDownload}"
+                    ToolTip.Tip="{Binding DownloadUpdateToolTip}" ToolTip.ShowOnDisabled="True" />
           </StackPanel>
           <ProgressBar Classes="accent" Minimum="0" Maximum="1"
                        Value="{Binding Progress}"

@@ -59,6 +59,7 @@ public partial class MainViewModel
     [NotifyPropertyChangedFor(nameof(ShowPlaylistDownload))]
     [NotifyPropertyChangedFor(nameof(ShowRetryFailed))]
     [NotifyCanExecuteChangedFor(nameof(CancelAllCommand))]
+    [NotifyPropertyChangedFor(nameof(IsAnyDownloadActive))]
     private bool _isQueueRunning;
 
     [ObservableProperty]

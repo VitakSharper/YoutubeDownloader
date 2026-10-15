@@ -22,9 +22,22 @@ public partial class UpdateViewModel : ObservableObject
 
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private bool _isUpdateAvailable;
-    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanStartUpdateDownload))] private bool _isBusy;
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _isDownloadingUpdate;
+
+    /// <summary>
+    /// A video or playlist download is running in the main window. Installing an update restarts the app,
+    /// which would kill that download, so the update's Download waits until it is over.
+    /// </summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanStartUpdateDownload)), NotifyPropertyChangedFor(nameof(DownloadUpdateToolTip))]
+    private bool _isAppDownloading;
+
+    public bool CanStartUpdateDownload => !IsBusy && !IsAppDownloading;
+
+    public string? DownloadUpdateToolTip => IsAppDownloading ? WaitForDownloadsHint : null;
+
+    private const string WaitForDownloadsHint = "Finish or cancel the current download first.";
 
     [RelayCommand]
     private async Task CheckForUpdatesAsync()
@@ -99,7 +112,7 @@ public partial class UpdateViewModel : ObservableObject
     [RelayCommand]
     private async Task DownloadUpdateAsync()
     {
-        if (IsBusy || _latest is null || !IsUpdateAvailable)
+        if (!CanStartUpdateDownload || _latest is null || !IsUpdateAvailable)
             return;
 
         IsBusy = true;
@@ -114,7 +127,10 @@ public partial class UpdateViewModel : ObservableObject
                 return;
 
             _revealer.RevealInFolder(exe);
-            Status = "Downloaded. Close the app, then replace the old .exe with the new one.";
+            // A download started while the update was downloading: restarting now would kill it.
+            Status = IsAppDownloading
+                ? "Downloaded, but not installed while a download is running. When it's done, close the app and replace the old .exe with the new one."
+                : "Downloaded. Close the app, then replace the old .exe with the new one.";
         }
         catch (Exception ex)
         {
@@ -129,11 +145,11 @@ public partial class UpdateViewModel : ObservableObject
 
     /// <summary>
     /// Replaces the running exe with <paramref name="exe"/> and restarts, when this build can.
-    /// False (manual flow) when it is not an exe, the build is not eligible, or the install fails.
+    /// False (manual flow) when a download is running, it is not an exe, the build is not eligible, or the install fails.
     /// </summary>
     private bool TryInstallAndRestart(string exe)
     {
-        if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !_selfUpdater.CanSelfUpdate)
+        if (IsAppDownloading || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !_selfUpdater.CanSelfUpdate)
             return false;
 
         Status = "Installing update…";

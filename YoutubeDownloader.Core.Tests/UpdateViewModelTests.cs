@@ -279,6 +279,56 @@ public class UpdateViewModelTests
     }
 
     [Fact]
+    public async Task Download_while_the_app_is_downloading_does_nothing()
+    {
+        var (vm, svc, _) = Make();
+        SetupDownload(svc);
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        vm.IsAppDownloading = true;
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        Assert.False(vm.CanStartUpdateDownload);
+        Assert.Equal("Finish or cancel the current download first.", vm.DownloadUpdateToolTip);
+        svc.Verify(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public void App_download_ending_makes_the_update_downloadable_again()
+    {
+        var (vm, _, _) = Make();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.IsAppDownloading = true;
+        vm.IsAppDownloading = false;
+
+        Assert.True(vm.CanStartUpdateDownload);
+        Assert.Null(vm.DownloadUpdateToolTip);
+        Assert.Equal(2, raised.Count(p => p == nameof(UpdateViewModel.CanStartUpdateDownload)));
+    }
+
+    [Fact]
+    public async Task Download_finishing_while_the_app_started_a_download_does_not_restart()
+    {
+        var self = new Mock<ISelfUpdater>();
+        self.SetupGet(s => s.CanSelfUpdate).Returns(true);
+        var (vm, svc, rev) = Make(self);
+        SetupDownload(svc);
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+        // The user starts a video download while the update zip is still downloading.
+        svc.Setup(s => s.DownloadAndExtractAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+           .Callback(() => vm.IsAppDownloading = true)
+           .ReturnsAsync(DownloadedExe);
+
+        await vm.DownloadUpdateCommand.ExecuteAsync(null);
+
+        self.Verify(s => s.ApplyAndRestart(It.IsAny<string>()), Times.Never);
+        rev.Verify(r => r.RevealInFolder(DownloadedExe), Times.Once);
+        Assert.Contains("not installed while a download is running", vm.Status);
+    }
+
+    [Fact]
     public async Task Download_when_eligible_installs_and_restarts()
     {
         var self = new Mock<ISelfUpdater>();

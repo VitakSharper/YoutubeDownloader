@@ -584,6 +584,27 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task IsAnyDownloadActive_FollowsASingleDownload()
+    {
+        SetupMp3Download(SampleInfo());
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(@"C:\ffmpeg\ffmpeg.exe");
+        var vm = CreateSut();
+        vm.Url = "https://youtu.be/dQw4w9WgXcQ";
+        await vm.FetchInfoCommand.ExecuteAsync(null);
+        var seen = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.IsAnyDownloadActive))
+                seen.Add(vm.IsAnyDownloadActive);
+        };
+
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Equal(new[] { true, false }, seen);
+    }
+
+    [Fact]
     public async Task Download_AfterUrlEditedToSameVideo_RecordsFetchedUrl()
     {
         SetupMp3Download(SampleInfo(sourceUrl: "https://youtu.be/dQw4w9WgXcQ"));

@@ -128,6 +128,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelDownloadCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSingleDownload))]
+    [NotifyPropertyChangedFor(nameof(IsAnyDownloadActive))]
     private bool _isDownloading;
 
     [ObservableProperty]
@@ -243,6 +244,9 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>The video quality picker shows in Video mode only.</summary>
     public bool ShowVideoQuality => SelectedMode == DownloadMode.Video;
+
+    /// <summary>A single video or a playlist queue is downloading. The update panel holds its install while true.</summary>
+    public bool IsAnyDownloadActive => IsDownloading || IsQueueRunning;
 
     public string? UpscaleWarning =>
         VideoInfo is not null

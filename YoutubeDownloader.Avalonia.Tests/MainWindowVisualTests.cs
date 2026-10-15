@@ -195,6 +195,40 @@ public class MainWindowVisualTests
     }
 
     /// <summary>
+    /// Installing an update restarts the app, so the header's update Download is disabled while a video
+    /// downloads (the window wires MainViewModel.IsAnyDownloadActive into UpdateViewModel.IsAppDownloading).
+    /// </summary>
+    [AvaloniaFact]
+    public async Task UpdateDownload_IsDisabledWhileAVideoDownloads()
+    {
+        _updates.Setup(u => u.CheckAsync(It.IsAny<CancellationToken>())).ReturnsAsync(NewerRelease());
+        _settings.Setup(s => s.Load()).Returns(new AppSettings { LastMode = "Video" });
+        _saveFile.Setup(s => s.PromptForSavePathAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(@"C:\scratch\Me at the zoo.mp4");
+        _ffmpeg.Setup(f => f.EnsureAsync(It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync("ffmpeg.exe");
+        _youtube.Setup(y => y.DownloadStreamAsync(It.IsAny<IStreamInfo>(), It.IsAny<string>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .Returns<IStreamInfo, string, IProgress<double>?, CancellationToken>((_, _, _, ct) => Task.Delay(Timeout.Infinite, ct));
+        var (window, vm, update) = Create();
+        await FetchAsync(vm, SampleInfo());
+        var updateDownload = window.FindControl<StackPanel>("UpdatePanel")!.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Content as string == "Download");
+        Assert.True(updateDownload.IsEffectivelyEnabled);
+
+        _ = vm.DownloadCommand.ExecuteAsync(null);
+        Settle();
+
+        Assert.True(update.IsAppDownloading);
+        Assert.False(updateDownload.IsEffectivelyEnabled);
+        Assert.Equal("Finish or cancel the current download first.", ToolTip.GetTip(updateDownload));
+        Snapshot(window, "update-held-during-download");
+
+        await vm.CancelDownloadCommand.ExecuteAsync(null);
+        Settle();
+        Assert.False(update.IsAppDownloading);
+        Assert.True(updateDownload.IsEffectivelyEnabled);
+    }
+
+    /// <summary>
     /// Plan 027b: a playlist run's entries sit under one collapsible sub-header in their date group, between
     /// single downloads; it starts collapsed, expands from the row or the control, and a search opens it.
     /// </summary>
