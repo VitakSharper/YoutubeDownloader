@@ -69,7 +69,7 @@
                     IsVisible="{Binding DetectedClipboardUrl, Converter={StaticResource NotEmpty}}">
               <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12.5" TextWrapping="Wrap"
-                           Foreground="#EDE9FE" Text="📋 Found a YouTube link on your clipboard." />
+                           Foreground="#EDE9FE" Text="{Binding DetectedClipboardMessage}" />
                 <Button Grid.Column="1" Classes="chip" Content="Use it"
                         Command="{Binding UseDetectedLinkCommand}" Margin="8,0,0,0" />
                 <Button Grid.Column="2" Classes="chip" Content="✕"
@@ -84,6 +84,24 @@
               <Button Grid.Column="1" Classes="accent" Content="Fetch"
                       Command="{Binding FetchInfoCommand}" />
             </Grid>
+
+            <!-- Mix / account-private list fallback: one muted line -->
+            <TextBlock Text="{Binding LinkHint}" Foreground="{StaticResource TextMutedBrush}"
+                       FontSize="11.5" TextWrapping="Wrap" Margin="2,0,0,0"
+                       IsVisible="{Binding LinkHint, Converter={StaticResource NotEmpty}}" />
+
+            <!-- A video inside a playlist: this video or the whole list -->
+            <Border Classes="card" Background="#2A1E3E" BorderBrush="#4C3A6E"
+                    IsVisible="{Binding HasPlaylistChoice}">
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" FontSize="12.5" TextWrapping="Wrap"
+                           Foreground="#EDE9FE" Text="{Binding PlaylistChoiceText}" />
+                <Button Grid.Column="1" Classes="chip" Content="This video"
+                        Command="{Binding ChooseThisVideoCommand}" Margin="8,0,0,0" />
+                <Button Grid.Column="2" Classes="chip" Content="Whole playlist"
+                        Command="{Binding ChooseWholePlaylistCommand}" Margin="6,0,0,0" />
+              </Grid>
+            </Border>
           </StackPanel>
 
           <!-- Video info card (title + author + thumbnail) -->
@@ -101,6 +119,36 @@
               </StackPanel>
             </Grid>
           </Border>
+
+          <!-- Playlist card (same cell: never shown with the video card) -->
+          <StackPanel Grid.Row="1" Margin="0,16,0,0" Spacing="10" IsVisible="{Binding IsPlaylistMode}">
+            <Border Classes="card">
+              <Grid ColumnDefinitions="Auto,*">
+                <Border Grid.Column="0" Width="96" Height="54" CornerRadius="8" ClipToBounds="True"
+                        Background="#221D30" Margin="0,0,14,0" VerticalAlignment="Top">
+                  <Image imaging:AsyncImage.SourceUrl="{Binding Playlist.ThumbnailUrl}" Stretch="UniformToFill" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding Playlist.Title}" Foreground="{StaticResource TextPrimaryBrush}"
+                             FontSize="15" FontWeight="Bold" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Playlist.Subtitle}" Foreground="{StaticResource TextSecondaryBrush}"
+                             FontSize="12" TextTrimming="CharacterEllipsis" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <CheckBox Grid.Column="0" Content="{Binding Playlist.SelectAllText}"
+                              IsChecked="{Binding Playlist.AllSelected}"
+                              FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Playlist.HiddenNote}" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="10,0,0,0"
+                               IsVisible="{Binding Playlist.HiddenNote, Converter={StaticResource NotEmpty}}" />
+                  </Grid>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Border CornerRadius="8" Background="#3A2A0C" Padding="10,7"
+                    IsVisible="{Binding Playlist.LargeListWarning, Converter={StaticResource NotNull}}">
+              <TextBlock Text="{Binding Playlist.LargeListWarning}" Foreground="#FCD34D" FontSize="12" TextWrapping="Wrap" />
+            </Border>
+          </StackPanel>
 
           <!-- Options -->
           <StackPanel Grid.Row="2" Margin="0,18,0,0" Spacing="0"
@@ -143,6 +191,23 @@
             </ComboBox>
           </StackPanel>
 
+          <!-- Playlist checklist (same cell as the options, which only show with a video).
+               A ListBox virtualizes its rows: keep it unwrapped and never swap it for an ItemsControl. -->
+          <ListBox Grid.Row="2" Classes="checklist" Margin="0,12,0,0" Background="Transparent"
+                   IsVisible="{Binding IsPlaylistMode}" ItemsSource="{Binding Playlist.Items}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:QueueItemViewModel">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                  <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" MinWidth="0" />
+                  <TextBlock Grid.Column="1" Text="{Binding NumberText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                  <TextBlock Grid.Column="2" Text="{Binding Item.Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3" Text="{Binding DurationText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="10,0" />
+                  <TextBlock Grid.Column="4" Text="{Binding StatusText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" MinWidth="80" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
           <!-- Progress -->
           <ProgressBar Grid.Row="3" Classes="accent" Margin="0,18,0,10"
                        Minimum="0" Maximum="1" Value="{Binding Progress}" />
@@ -152,7 +217,7 @@
             <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}"
                        FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
             <Button Grid.Column="1" Classes="accent" Content="Download" Padding="26,10"
-                    Command="{Binding DownloadCommand}" IsVisible="{Binding !IsDownloading}" />
+                    Command="{Binding DownloadCommand}" IsVisible="{Binding ShowSingleDownload}" />
             <Button Grid.Column="1" Classes="accent" Content="Cancel" Padding="26,10"
                     Command="{Binding CancelDownloadCommand}" IsVisible="{Binding IsDownloading}" />
           </Grid>
