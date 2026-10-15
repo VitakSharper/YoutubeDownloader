@@ -62,6 +62,7 @@ public partial class App : Application
             new HttpThumbnailFetcher(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }, sp.GetRequiredService<ITempFileService>()));
         services.AddSingleton<IOutputFileService, OutputFileService>();
         services.AddSingleton<IDownloadPipeline, DownloadPipeline>();
+        services.AddSingleton<IRetryDelay>(_ => new TimeProviderRetryDelay(TimeProvider.System));
         services.AddSingleton<ISaveFileService, AvaloniaSaveFileService>();
         services.AddSingleton<IFolderPickerService, AvaloniaFolderPickerService>();
         services.AddSingleton<IHistoryStore>(_ => new JsonHistoryStore(baseDir));
