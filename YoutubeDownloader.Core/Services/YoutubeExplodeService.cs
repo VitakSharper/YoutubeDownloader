@@ -1,3 +1,4 @@
+using System.Net;
 using System.Runtime.CompilerServices;
 using YoutubeExplode;
 using YoutubeExplode.Common;
@@ -11,7 +12,12 @@ public sealed class YoutubeExplodeService : IYouTubeService
 {
     private const int ThumbnailMinWidth = 240; // 2× the 120 px thumbnail box in MainWindow.axaml — sharp up to 200% DPI
 
-    private readonly YoutubeClient _client = new();
+    // YoutubeExplode 6.6.2 hard-codes a SOCS consent cookie that YouTube stopped accepting in the EU (Oct 2026):
+    // every watch page then redirects to consent.youtube.com and fails with "Video watch page is broken".
+    // A cookie passed here replaces the built-in one. Drop this once a YoutubeExplode release refreshes the value.
+    private const string ConsentCookieValue = "CAISEwgDEgk2NzM5OTg2ODUaAmVuIAEaBgiA6p23Bg";
+
+    private readonly YoutubeClient _client = new([new Cookie("SOCS", ConsentCookieValue) { Domain = "youtube.com" }]);
 
     public async Task<VideoInfo> GetVideoInfoAsync(string url, CancellationToken ct)
     {
